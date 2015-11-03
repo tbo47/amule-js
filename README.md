@@ -1,14 +1,10 @@
-# amule-js : Javascript amule client
-
-## Description
-
 amule-js is a javascript API to connect to amule/amuled.
 
 amule-connect.js contains methods to build binary requests and read binary responses for [amule](https://en.wikipedia.org/wiki/AMule). It's not specific to any javascript engine. It uses [DataViews](http://www.javascripture.com/DataView) to create and read [ArrayBuffers](http://www.javascripture.com/ArrayBuffer).
 
-amule-chrome.js contains methods to create a [TCP](https://developer.chrome.com/apps/sockets_tcp) client for Chrome/Chromium and wrap the requests/responses defined in amule-connect.js.
+amule-chrome.js contains methods to create a [TCP](https://developer.chrome.com/apps/sockets_tcp) client for Chrome/Chromium and wrap the requests/responses defined in amule-connect.js. Note that the tcp api can only be called inside a chrome app and not a regular page.
 
-Therefore amule-connect.js has no dependency on amule-chrome.js. And amule-chrome.js depends heavily on amule-connect.js.   
+Therefore amule-connect.js has no dependency on amule-chrome.js. And amule-chrome.js depends heavily on amule-connect.js.
 
 ## Usage
 

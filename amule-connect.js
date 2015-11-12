@@ -330,7 +330,11 @@ AMC.prototype.readSalt = function(buffer) {
 	if (this.responseOpcode == 79) {
 		var dv = new DataView(buffer, offset, 8);// 8 bytes
 		for (var i = 0; i < 8; i++) {
-			this.solt += dv.getUint8(i).toString(16).toUpperCase();
+			var c = dv.getUint8(i).toString(16).toUpperCase();
+			if (c.length < 2 && i != 0) {
+				c = '0' + c;
+			}
+			this.solt += c;
 		}
 		offset = offset + 8;
 	}
@@ -362,11 +366,11 @@ AMC.prototype.debugResponseChild = function(buffer, offset) {
 		console.log("response tag # value 1 byte: " + dataView.getUint8(0, false));
 		offset = offset + Uint8Array.BYTES_PER_ELEMENT;
 	} else if (type == 6) {
-		//string
+		// string
 		var text;
 		for (var i = 0; i < length; i++) {
-			var dataView = new DataView(buffer, offset+i, Uint8Array.BYTES_PER_ELEMENT);
-			text += ""+dataView.getUint8(0).toString(16);
+			var dataView = new DataView(buffer, offset + i, Uint8Array.BYTES_PER_ELEMENT);
+			text += "" + dataView.getUint8(0).toString(16);
 			offset += Uint8Array.BYTES_PER_ELEMENT;
 		}
 		console.log("response tag # value text : " + text);

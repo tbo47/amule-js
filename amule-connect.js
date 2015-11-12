@@ -1,5 +1,7 @@
 "use strict";
 /*
+ * https://github.com/tla-dev/amule-js/
+ * 
  * Licensed under the MIT license: http://www.opensource.org/licenses/MIT
  * 
  * AMC : AMuleConnect object. Contain a set of methods to binary communicate with an amuled server.
@@ -27,8 +29,11 @@ var ECOpCodes = {
 	EC_TAGTYPE_HASH16 : 0x09,
 	EC_OP_AUTH_FAIL : 0x03,
 	EC_OP_AUTH_OK : 0x04,
-	EC_OP_SEARCH_START : 0x26
-
+	EC_OP_SEARCH_START : 0x26,
+	EC_OP_SEARCH_STOP : 0x27,
+	EC_OP_SEARCH_RESULTS : 0x28,
+	EC_OP_SEARCH_PROGRESS : 0x29,
+	EC_OP_DOWNLOAD_SEARCH_RESULT : 0x2A
 };
 var ECTagNames = {
 	EC_TAG_CLIENT_NAME : 0x0100,
@@ -225,12 +230,11 @@ AMC.prototype.getAuthRequest2 = function() {
 }
 
 AMC.prototype.getSearchStartRequest = function(q) {
-	// TODO
 	this._setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_START);
 	var tagCount = 0;
 	var children = [];
 	var searchTag = {
-		"ecTag" : EC_TAG_SEARCHFILE.EC_TAG_SEARCH_NAME,
+		"ecTag" : 3588,
 		"ecOp" : ECOpCodes.EC_OP_STRINGS,
 		"value" : q + "\0"
 	}
@@ -249,6 +253,13 @@ AMC.prototype.getSearchStartRequest = function(q) {
 	children.push(fileTypeTag);
 
 	this._buildTagArrayBuffer(EC_TAG_SEARCHFILE.EC_TAG_SEARCH_TYPE, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, children);
+	tagCount++;
+	return this._finalizeRequest(tagCount);
+}
+AMC.prototype.getSearchResultRequest = function() {
+	this._setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_RESULTS);
+	var tagCount = 0;
+	this._buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
 	tagCount++;
 	return this._finalizeRequest(tagCount);
 }
@@ -324,4 +335,73 @@ AMC.prototype.readSalt = function(buffer) {
 		offset = offset + 8;
 	}
 	return this.responseOpcode;
+}
+AMC.prototype.debugResponseChild = function(buffer, offset) {
+	console.log("");
+	var dataView = new DataView(buffer, offset, Uint16Array.BYTES_PER_ELEMENT);
+	console.log("response tag # name (ecTag) : " + dataView.getUint16(0, false));
+	offset = offset + Uint16Array.BYTES_PER_ELEMENT;
+
+	var dataView = new DataView(buffer, offset, Uint8Array.BYTES_PER_ELEMENT);
+	var type = dataView.getUint8(0, false);
+	console.log("response tag # type (ecOp): " + dataView.getUint8(0, false));
+	offset = offset + Uint8Array.BYTES_PER_ELEMENT;
+
+	var dataView = new DataView(buffer, offset, Uint32Array.BYTES_PER_ELEMENT);
+	var length = dataView.getUint32(0, false);
+	console.log("response tag # length : " + dataView.getUint32(0, false));
+	offset = offset + Uint32Array.BYTES_PER_ELEMENT;
+
+	if (type == 3) {
+		var dataView = new DataView(buffer, offset, Uint16Array.BYTES_PER_ELEMENT);
+		console.log("response tag # value 2 bytes: " + dataView.getUint16(0, false));
+		offset = offset + Uint16Array.BYTES_PER_ELEMENT;
+
+	} else if (type == 2) {
+		var dataView = new DataView(buffer, offset, Uint8Array.BYTES_PER_ELEMENT);
+		console.log("response tag # value 1 byte: " + dataView.getUint8(0, false));
+		offset = offset + Uint8Array.BYTES_PER_ELEMENT;
+	} else if (type == 6) {
+		//string
+		var text;
+		for (var i = 0; i < length; i++) {
+			var dataView = new DataView(buffer, offset+i, Uint8Array.BYTES_PER_ELEMENT);
+			text += ""+dataView.getUint8(0).toString(16);
+			offset += Uint8Array.BYTES_PER_ELEMENT;
+		}
+		console.log("response tag # value text : " + text);
+	}
+
+	return offset;
+}
+AMC.prototype.readResultsList = function(buffer) {
+
+	var offset = 0;
+	var dataView = new DataView(buffer, offset, Uint32Array.BYTES_PER_ELEMENT);
+	// console.log("response header : " + dataView.getUint32(0, false));
+	offset = offset + Uint32Array.BYTES_PER_ELEMENT;
+
+	var dataView = new DataView(buffer, offset, Uint32Array.BYTES_PER_ELEMENT);
+	console.log("response length : " + dataView.getUint32(0, false));
+	offset = offset + Uint32Array.BYTES_PER_ELEMENT;
+
+	var dataView = new DataView(buffer, offset, Uint8Array.BYTES_PER_ELEMENT);
+	this.responseOpcode = dataView.getUint8(0);
+	offset = offset + Uint8Array.BYTES_PER_ELEMENT;
+	if (this.responseOpcode != 40) {
+		return null;
+	}
+	console.log("response opcode: " + this.responseOpcode);
+
+	var dataView = new DataView(buffer, offset, Uint16Array.BYTES_PER_ELEMENT);
+	var tagCountInResponse = dataView.getUint16(0, false);
+	console.log("response tag count : " + tagCountInResponse);
+	offset = offset + Uint16Array.BYTES_PER_ELEMENT;
+
+	for (var j = 0; j < tagCountInResponse; j++) {
+		offset = this.debugResponseChild(buffer, offset);
+	}
+
+	// TODO return something
+
 }

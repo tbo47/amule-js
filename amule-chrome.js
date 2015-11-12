@@ -1,4 +1,6 @@
 /*
+ * https://github.com/tla-dev/amule-js/
+ * 
  * Licensed under the MIT license:
  * http://www.opensource.org/licenses/MIT
  *
@@ -49,5 +51,17 @@ AmuleChrome.prototype.search = function(q, callback) {
 	console.log("ChromeIO.search() starts search");
 	currentCallBackFunction = callback;
 	chrome.sockets.tcp.send(socketId, this.ac.getSearchStartRequest(q), function(sendInfo) {
+	});
+}
+AmuleChrome.prototype.searchQueryResult = function(callback) {
+	console.log("ChromeIO.searchQueryResult() get results");
+	var ac1 = this.ac;
+	this.__searchQueryResult(function(info) {
+		callback(ac1.readResultsList(info.data));
+	});
+}
+AmuleChrome.prototype.__searchQueryResult = function(callback) {
+	currentCallBackFunction = callback;
+	chrome.sockets.tcp.send(socketId, this.ac.getSearchResultRequest(), function(sendInfo) {
 	});
 }

@@ -11,4 +11,4 @@ git clone https://github.com/amule-project/amule
 
 make > make.txt 2>&1
 
-./src/amuled
+./src/amuled --log-stdout

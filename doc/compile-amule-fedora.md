@@ -12,3 +12,13 @@ git clone https://github.com/amule-project/amule
 make > make.txt 2>&1
 
 ./src/amuled --log-stdout
+
+
+### debug command
+
+AddLogLineNS(wxT("hi there"));
+
+return true in bool ECLogIsEnabled()
+
+CECTag::DebugPrint
+CECPacket::DebugPrint

@@ -21,4 +21,14 @@ AddLogLineNS(wxT("hi there"));
 return true in bool ECLogIsEnabled()
 
 CECTag::DebugPrint
+    wxString s1 = CFormat(wxT("%s%s tagName:%d dataType:%d dataLen:%d = ")) % space % GetDebugNameECTagNames(m_tagName) % m_tagName % m_dataType % m_dataLen;
+
+
 CECPacket::DebugPrint
+    if (trueSize == 0 || size == trueSize) {
+      DoECLogLine(CFormat(wxT("%s %s opCode:%d size:%d")) % (incoming ? wxT("<") : wxT(">"))
+        % GetDebugNameECOpCodes(m_opCode) % m_opCode % size);
+    } else {
+      DoECLogLine(CFormat(wxT("%s %s %d (compressed: %d)")) % (incoming ? wxT("<") : wxT(">"))
+        % GetDebugNameECOpCodes(m_opCode) % size % trueSize);
+    }

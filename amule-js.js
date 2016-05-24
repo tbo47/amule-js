@@ -1,11 +1,6 @@
 /*
- * amule-js
  * https://github.com/tla-dev/amule-js
- *
- * Copyright (c) 2016 tla-dev
- * Licensed under the MIT license.
  */
-
 (function(exports) {
   'use strict';
 
@@ -460,43 +455,45 @@
    *
    */
   var readResultsList = function(buffer) {
-    var res = {};
-    offset = 0;
-    res.header = readBuffer(buffer, 4);
-    // length (total minus header and response Length)
-    var responseLength = readBuffer(buffer, 4);
-    // response length (total minus header, response length, opcode, tag count)
-    // res.responseLength = responseLength - 3;
-    res.totalSizeOfRequest = responseLength + 6;// the 6 is deduce
-    res.opCode = readBuffer(buffer, 1);
-    res.tagCountInResponse = readBuffer(buffer, 2);
-    if(res.opCode === 1) {
-      res.opCodeLabel = 'EC_OP_NOOP';
-    } else if (res.opCode === 5) {
-      res.opCodeLabel = 'EC_OP_FAILED';
-    } else if (res.opCode === 40) {
-      res.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
-    }
+    return new Promise(function(resolve, reject) {
+      var res = {};
+      offset = 0;
+      res.header = readBuffer(buffer, 4);
+      // length (total minus header and response Length)
+      var responseLength = readBuffer(buffer, 4);
+      // response length (total minus header, response length, opcode, tag count)
+      // res.responseLength = responseLength - 3;
+      res.totalSizeOfRequest = responseLength + 6;// the 6 is deduce
+      res.opCode = readBuffer(buffer, 1);
+      res.tagCountInResponse = readBuffer(buffer, 2);
+      if(res.opCode === 1) {
+        res.opCodeLabel = 'EC_OP_NOOP';
+      } else if (res.opCode === 5) {
+        res.opCodeLabel = 'EC_OP_FAILED';
+      } else if (res.opCode === 40) {
+        res.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
+      }
 
-    readBufferChildren(buffer, res, res.totalSizeOfRequest);
-    res.children.forEach(function(e) {
-      e.children.forEach(function(m) {
-        if(m.nameEcTag === 769) { // EC_TAG_PARTFILE_NAME
-          e.value = m.value;
-        }
-        if(m.nameEcTag === 798) { // EC_TAG_PARTFILE_HASH
-          e.hash = m.value;
-        }
-        if(m.nameEcTag === 771) { // EC_TAG_PARTFILE_SIZE_FULL
-          e.size = m.value;
-        }
-        if(m.nameEcTag === 782) { // EC_TAG_PARTFILE_ED2K_LINK
-          e.edkLink = m.value;
-        }
+      readBufferChildren(buffer, res, res.totalSizeOfRequest);
+      res.children.forEach(function(e) {
+        e.children.forEach(function(m) {
+          if(m.nameEcTag === 769) { // EC_TAG_PARTFILE_NAME
+            e.value = m.value;
+          }
+          if(m.nameEcTag === 798) { // EC_TAG_PARTFILE_HASH
+            e.hash = m.value;
+          }
+          if(m.nameEcTag === 771) { // EC_TAG_PARTFILE_SIZE_FULL
+            e.size = m.value;
+          }
+          if(m.nameEcTag === 782) { // EC_TAG_PARTFILE_ED2K_LINK
+            e.edkLink = m.value;
+          }
+        });
       });
+      console.log(res);
+      resolve(res);
     });
-    console.log(res);
-    return res;
   };
 
   /**
@@ -563,26 +560,28 @@
   /**
    *
    */
-  var connect = function(ip, port, password, md5, callback) {
-    initConnToServer(ip, port).then(function() {
-      init(password, md5);
-      return sendToServer_simple(getAuthRequest1());
-    })
-    .then(function(data) {
-      readSalt(data);
-      return sendToServer_simple($.getAuthRequest2());
-    })
-    .then(function(data) {
-      if (readSalt(data) === 4) {
-        callback('You are successfuly connected to amule');
-      }
-      else {
-        callback('You are NOT connected to amule');
-      }
-    })
-    .catch(function (err) {
-      console.log("error: ", err);
-      callback('You are NOT connected to amule');
+  var connect = function(ip, port, password, md5) {
+    return new Promise(function(resolve, reject) {
+      initConnToServer(ip, port).then(function() {
+        init(password, md5);
+        return sendToServer_simple(getAuthRequest1());
+      })
+      .then(function(data) {
+        readSalt(data);
+        return sendToServer_simple($.getAuthRequest2());
+      })
+      .then(function(data) {
+        if (readSalt(data) === 4) {
+          resolve('You are successfuly connected to amule');
+        }
+        else {
+          reject('You are NOT connected to amule');
+        }
+      })
+      .catch(function (err) {
+        console.log("error: ", err);
+        reject('You are NOT connected to amule: ' + err);
+      });
     });
   };
 
@@ -590,36 +589,36 @@
    * send a search request
    */
   var search = function(q) {
-    sendToServer($.getSearchStartRequest(q));
+    return sendToServer($.getSearchStartRequest(q));
   };
 
-  var fetchSearch = function(callback) {
-    sendToServer(getSearchResultRequest()).then(function (data) {
-     callback(readResultsList(data));
+  var fetchSearch = function() {
+    return sendToServer(getSearchResultRequest()).then(function (data) {
+     return readResultsList(data);
     });
   };
 
-  var getDownloads = function(callback) {
-    sendToServer(getDownloadsRequest()).then(function (data) {
-      callback(readResultsList(data));
+  var getDownloads = function() {
+    return sendToServer(getDownloadsRequest()).then(function (data) {
+      return readResultsList(data);
     });
   };
 
-  var getSharedFiles = function(callback) {
-    sendToServer(getSharedFilesRequest()).then(function (data) {
-      callback(readResultsList(data));
+  var getSharedFiles = function() {
+    return sendToServer(getSharedFilesRequest()).then(function (data) {
+      return readResultsList(data);
     });
   };
 
-  var clearCompleted = function(callback) {
-    sendToServer_simple(clearCompletedRequest()).then(function (data) {
-      callback(readResultsList(data));
+  var clearCompleted = function() {
+    return sendToServer_simple(clearCompletedRequest()).then(function (data) {
+      return readResultsList(data);
     });
   };
 
-  var getStats = function(callback) {
-    sendToServer_simple(getStatsRequest()).then(function (data) {
-      callback(readResultsList(data));
+  var getStats = function() {
+    return sendToServer_simple(getStatsRequest()).then(function (data) {
+      return readResultsList(data);
     });
   };
 

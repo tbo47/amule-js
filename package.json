@@ -1,41 +1,24 @@
 {
   "name": "amule-js",
-  "description": "javascript API for amule amuled",
-  "version": "0.1.0",
-  "homepage": "https://github.com/tla-dev/amule-js",
-  "author": {
-    "name": "tla-dev"
+  "version": "1.0.0",
+  "description": "javascript client for amule",
+  "main": "amule-js.js",
+  "dependencies": {
+    "blueimp-md5": "^2.3.0"
   },
+  "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/tla-dev/amule-js.git"
+    "url": "git+https://github.com/tla-dev/amule-js.git"
   },
+  "keywords": [
+    "javascript",
+    "amule"
+  ],
+  "author": "tla-dev (https://github.com/tla-dev)",
+  "license": "ISC",
   "bugs": {
     "url": "https://github.com/tla-dev/amule-js/issues"
   },
-  "licenses": [
-    {
-      "type": "MIT",
-      "url": "https://github.com/tla-dev/amule-js/blob/master/LICENSE-MIT"
-    }
-  ],
-  "main": "lib/amule-js",
-  "engines": {
-    "node": ">= 5.6.0"
-  },
-  "scripts": {
-    "test": "grunt nodeunit"
-  },
-  "devDependencies": {
-    "grunt-contrib-concat": "~1.0.1",
-    "grunt-contrib-uglify": "~1.0.1",
-    "grunt-contrib-jshint": "~1.0.0",
-    "grunt-contrib-nodeunit": "~1.0.0",
-    "grunt-contrib-watch": "~1.0.0",
-    "grunt": "~1.0.1"
-  },
-  "keywords": [],
-  "dependencies": {
-    "blueimp-md5": "^2.3.0"
-  }
+  "homepage": "https://github.com/tla-dev/amule-js#readme"
 }

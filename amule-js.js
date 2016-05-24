@@ -73,7 +73,7 @@
   /**
    * Used internally to build a request
    */
-  $._buildTagArrayBuffer = function(ecTag, ecOp, value, children) {
+  var _buildTagArrayBuffer = function(ecTag, ecOp, value, children) {
     $.data.recurcifInBuildTagArrayBuffer++;
     var tagLength = 0;
     var dv = new DataView(new ArrayBuffer(Uint16Array.BYTES_PER_ELEMENT));
@@ -107,7 +107,7 @@
       tagLength += Uint16Array.BYTES_PER_ELEMENT;
       for (var m = 0; m < children.length; m++) {
         // console.log("child " + children[m].ecTag + " " + children[m].ecOp + " " + children[m].value);
-        childrenTagsLength += $._buildTagArrayBuffer(children[m].ecTag, children[m].ecOp, children[m].value, null);
+        childrenTagsLength += _buildTagArrayBuffer(children[m].ecTag, children[m].ecOp, children[m].value, null);
         // console.log("childrenTagsLength : " + childrenTagsLength);
       }
       dv.setUint16(0, children.length, false);
@@ -124,8 +124,7 @@
       lengthDataView.setUint32(0, value.length / 2 + childrenTagsLength, false);
     }
     else {
-      //TODO get rid of eval()
-      lengthDataView.setUint32(0, eval(value.length + childrenTagsLength), false);
+      lengthDataView.setUint32(0, parseInt(value.length + childrenTagsLength), false);
     }
 
     // set content
@@ -166,7 +165,7 @@
   /**
    * Build request headers
    */
-  $._setHeadersToRequest = function(opCode) {
+  var _setHeadersToRequest = function(opCode) {
     var dv = new DataView(new ArrayBuffer(Uint32Array.BYTES_PER_ELEMENT));
     // set flags, normal === 32 (34 pour amule-gui)
     dv.setUint32(0, 32, false);
@@ -221,13 +220,13 @@
    * @returns {ArrayBuffer}
    */
   var getAuthRequest1 = function() {
-    $._setHeadersToRequest(ECCodes.EC_OP_AUTH_REQ);
+    _setHeadersToRequest(ECCodes.EC_OP_AUTH_REQ);
     var tagCount = 0;
-    $._buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_NAME, ECOpCodes.EC_OP_STRINGS, "amule-js\0", null);
+    _buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_NAME, ECOpCodes.EC_OP_STRINGS, "amule-js\0", null);
     tagCount++;
-    $._buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_VERSION, ECOpCodes.EC_OP_STRINGS, "1.0\0", null);
+    _buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_VERSION, ECOpCodes.EC_OP_STRINGS, "1.0\0", null);
     tagCount++;
-    $._buildTagArrayBuffer(4, ECOpCodes.EC_TAGTYPE_UINT16, ProtocolVersion.EC_CURRENT_PROTOCOL_VERSION, null);
+    _buildTagArrayBuffer(4, ECOpCodes.EC_TAGTYPE_UINT16, ProtocolVersion.EC_CURRENT_PROTOCOL_VERSION, null);
     tagCount++;
     return $._finalizeRequest(tagCount);
   };
@@ -238,9 +237,9 @@
    * @returns {ArrayBuffer}
    */
   $.getAuthRequest2 = function() {
-    $._setHeadersToRequest(80);
+    _setHeadersToRequest(80);
     var tagCount = 0;
-    $._buildTagArrayBuffer(2, ECOpCodes.EC_TAGTYPE_HASH16, $.md5($.data.md5 + $.md5($.data.solt)), null);
+    _buildTagArrayBuffer(2, ECOpCodes.EC_TAGTYPE_HASH16, $.md5($.data.md5 + $.md5($.data.solt)), null);
     tagCount++;
     return $._finalizeRequest(tagCount);
   };
@@ -249,7 +248,7 @@
    *
    */
   $.getSearchStartRequest = function(q) {
-    $._setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_START);
+    _setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_START);
     var tagCount = 0;
     var children = [];
     var searchTag = {
@@ -271,7 +270,7 @@
     };
     children.push(fileTypeTag);
 
-    $._buildTagArrayBuffer(EC_TAG_SEARCHFILE.EC_TAG_SEARCH_TYPE, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, children);
+    _buildTagArrayBuffer(EC_TAG_SEARCHFILE.EC_TAG_SEARCH_TYPE, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, children);
     tagCount++;
     return $._finalizeRequest(tagCount);
   };
@@ -280,9 +279,9 @@
    *
    */
   var getSharedFilesRequest = function() {
-    $._setHeadersToRequest(ECCodes.EC_OP_GET_SHARED_FILES);
+    _setHeadersToRequest(ECCodes.EC_OP_GET_SHARED_FILES);
     var tagCount = 0;
-    // $._buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
+    // _buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
     // tagCount++;
     return $._finalizeRequest(tagCount);
   };
@@ -291,9 +290,9 @@
    *
    */
    var getSearchResultRequest = function() {
-     $._setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_RESULTS);
+     _setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_RESULTS);
      var tagCount = 0;
-     $._buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
+     _buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
      tagCount++;
      return $._finalizeRequest(tagCount);
    };
@@ -302,11 +301,11 @@
    *
    */
   var getDownloadsRequest = function() {
-    $._setHeadersToRequest(0x0D); // EC_OP_GET_DLOAD_QUEUE
+    _setHeadersToRequest(0x0D); // EC_OP_GET_DLOAD_QUEUE
     var tagCount = 0;
     var EC_TAG_DETAIL_LEVEL = 8;
     var EC_DETAIL_INC_UPDATE = 4;
-    $._buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL, ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_INC_UPDATE, null);
+    _buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL, ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_INC_UPDATE, null);
     tagCount++;
     return $._finalizeRequest(tagCount);
   };
@@ -315,7 +314,7 @@
    *
    */
   var clearCompletedRequest = function() {
-    $._setHeadersToRequest(0x53); // EC_OP_CLEAR_COMPLETED
+    _setHeadersToRequest(0x53); // EC_OP_CLEAR_COMPLETED
     return $._finalizeRequest(0);
   };
 
@@ -323,11 +322,11 @@
    *
    */
   var getStatsRequest = function() {
-    $._setHeadersToRequest(10); // EC_OP_STAT_REQ
+    _setHeadersToRequest(10); // EC_OP_STAT_REQ
     var tagCount = 0;
     var EC_TAG_DETAIL_LEVEL = 4;
     var EC_DETAIL_INC_UPDATE = 4;
-    $._buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL, ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_INC_UPDATE, null);
+    _buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL, ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_INC_UPDATE, null);
     tagCount++;
     return $._finalizeRequest(tagCount);
   };

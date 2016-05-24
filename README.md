@@ -15,13 +15,17 @@ aMule.getSharedFiles().then(function(listOfFileJSON){
 ```
 
 ```javascript
-aMule.search('search key words').then(...);
+aMule.search('search key words');
 ```
 
 ```javascript
-aMule.fetchSearch().then(...)
+aMule.fetchSearch().then(function(listOfFileJSON){
+  // parse json file
+})
 ```
 
 ```javascript
-  aMule.getDownloads().then(...);
+aMule.getDownloads().then(function(listOfFileJSON){
+  // parse json file
+});
 ```

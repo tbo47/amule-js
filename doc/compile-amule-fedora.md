@@ -7,7 +7,7 @@ git clone https://github.com/amule-project/amule
 
 ./autogen.sh
 
-./configure --enable-ccache --enable-amule-daemon CFLAGS="-fPIC" CXXFLAGS="-fPIC"
+./configure --enable-ccache --enable-amule-daemon --enable-amulecmd CFLAGS="-fPIC" CXXFLAGS="-fPIC"
 
 make > make.txt 2>&1
 

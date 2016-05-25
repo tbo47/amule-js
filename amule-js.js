@@ -220,11 +220,11 @@
    * @returns {ArrayBuffer}
    */
   var getAuthRequest1 = function() {
-    _setHeadersToRequest(ECCodes.EC_OP_AUTH_REQ);
+    _setHeadersToRequest(2);//EC_OP_AUTH_REQ
     var tagCount = 0;
-    _buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_NAME, ECOpCodes.EC_OP_STRINGS, "amule-js\0", null);
+    _buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_NAME*2, ECOpCodes.EC_OP_STRINGS, "amule-js\0", null);
     tagCount++;
-    _buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_VERSION, ECOpCodes.EC_OP_STRINGS, "1.0\0", null);
+    _buildTagArrayBuffer(ECTagNames.EC_TAG_CLIENT_VERSION*2, ECOpCodes.EC_OP_STRINGS, "1.0\0", null);
     tagCount++;
     _buildTagArrayBuffer(4, ECOpCodes.EC_TAGTYPE_UINT16, ProtocolVersion.EC_CURRENT_PROTOCOL_VERSION, null);
     tagCount++;
@@ -301,13 +301,8 @@
    *
    */
   var getDownloadsRequest = function() {
-    _setHeadersToRequest(0x0D); // EC_OP_GET_DLOAD_QUEUE
-    var tagCount = 0;
-    var EC_TAG_DETAIL_LEVEL = 8;
-    var EC_DETAIL_INC_UPDATE = 4;
-    _buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL, ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_INC_UPDATE, null);
-    tagCount++;
-    return $._finalizeRequest(tagCount);
+    _setHeadersToRequest(13); // EC_OP_GET_DLOAD_QUEUE
+    return $._finalizeRequest(0);
   };
 
   /**
@@ -365,7 +360,7 @@
   };
 
   /**
-   * ------------------------------------------------------------------------------------------------------------
+   *
    */
   var readBuffer = function(buffer, byteNumberToRead, littleEndian = false) {
     var val = null;
@@ -469,9 +464,12 @@
         res.opCodeLabel = 'EC_OP_NOOP';
       } else if (res.opCode === 5) {
         res.opCodeLabel = 'EC_OP_FAILED';
+      } else if (res.opCode === 31) {
+        res.opCodeLabel = 'EC_OP_DLOAD_QUEUE';
       } else if (res.opCode === 40) {
         res.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
       }
+      console.log(res);
 
       readBufferChildren(buffer, res, res.totalSizeOfRequest);
       res.children.forEach(function(e) {

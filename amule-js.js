@@ -10,6 +10,7 @@
   };
   var offset = 0;
   var socketId;
+  const textDecoder = new TextDecoder('iso-8859-1'); // utf-8 iso-8859-1
 
   const _init = (password, md5) => {
     $.md5 = md5;
@@ -333,24 +334,23 @@
    */
   const getStatsRequest = () => {
     _setHeadersToRequest(10); // EC_OP_STAT_REQ
-    var tagCount = 0;
-    var EC_TAG_DETAIL_LEVEL = 4;
-    var EC_DETAIL_INC_UPDATE = 4;
+    let tagCount = 0;
+    const EC_TAG_DETAIL_LEVEL = 4;
+    const EC_DETAIL_INC_UPDATE = 4;
     _buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL, ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_INC_UPDATE, null);
     tagCount++;
     return _finalizeRequest(tagCount);
   };
 
-  function ab2str(ab) {
-    var dataView = new DataView(ab);
-    var decoder = new TextDecoder('utf-8');
-    return decoder.decode(dataView);
-  }
-
-  function str2ab(str) {
-      var encoder = new TextEncoder('utf-8');
-      return encoder.encode(str).buffer;
-  }
+  /**
+   * < EC_OP_PARTFILE_DELETE opCode:29 size:26 (compressed: 22)
+   *     EC_TAG_PARTFILE tagName:768 dataType:9 dataLen:16 = EA63C3774DF2EB871EFA3AC58543B66F
+   */
+  const getCancelDownloadRequest = (e) => {
+    _setHeadersToRequest(29); // EC_OP_PARTFILE_DELETE
+    _buildTagArrayBuffer(768*2, ECOpCodes.EC_TAGTYPE_HASH16, e.hash);
+    return _finalizeRequest(1);
+  };
 
   /**
    *
@@ -437,13 +437,14 @@
             child2.value = readBuffer(buffer, child2.length);
           }
           else if (child2.typeEcOp === 4) { // integer
-            for (var m = 0; m < child2.length; m++) {
+            for (let m = 0; m < child2.length; m++) {
               child2.value += "" + readBuffer(buffer, 1);
             }
           }
           else if (child2.typeEcOp === ECOpCodes.EC_OP_STRINGS) { // 6
-            for (var m = 0; m < child2.length; m++) {
-              child2.value += "" + String.fromCharCode(readBuffer(buffer, 1));
+            for (let m = 0; m < child2.length; m++) {
+              child2.value += textDecoder.decode(new DataView(buffer, offset++, 1));
+              // child2.value += "" + String.fromCharCode(readBuffer(buffer, 1));
             }
           }
           else if (child2.typeEcOp === ECOpCodes.EC_TAGTYPE_HASH16) { //9
@@ -475,18 +476,23 @@
     return res;
   };
 
+  const _readHeader = buffer => {
+    let res = {};
+    offset = 0;
+    res.header = readBuffer(buffer, 4);
+    // length (total minus header and response Length)
+    let responseLength = readBuffer(buffer, 4);
+    // response length (total minus header, response length, opcode, tag count)
+    // res.responseLength = responseLength - 3;
+    res.totalSizeOfRequest = responseLength + 6;// the 6 is deduce. I think it is 8 in fact
+    res.opCode = readBuffer(buffer, 1);
+    res.tagCountInResponse = readBuffer(buffer, 2);
+    return res;
+  }
+
   const readResultsList = buffer => {
     return new Promise((resolve, reject) => {
-      let res = {};
-      offset = 0;
-      res.header = readBuffer(buffer, 4);
-      // length (total minus header and response Length)
-      let responseLength = readBuffer(buffer, 4);
-      // response length (total minus header, response length, opcode, tag count)
-      // res.responseLength = responseLength - 3;
-      res.totalSizeOfRequest = responseLength + 6;// the 6 is deduce
-      res.opCode = readBuffer(buffer, 1);
-      res.tagCountInResponse = readBuffer(buffer, 2);
+      let res = _readHeader(buffer);
       if(res.opCode === 1) {
         res.opCodeLabel = 'EC_OP_NOOP';
       } else if (res.opCode === 5) {
@@ -538,28 +544,41 @@
 
   const sendToServer = data => {
     return new Promise((resolve, reject) => {
-      let buf = [];
+
+      let buf = [], totalSizeOfRequest, frequency = 100, timeout = 200, count = 0;
+
       chrome.sockets.tcp.send(socketId, data, info => {});
       chrome.sockets.tcp.onReceive.addListener(info => {
         buf.push(info.data);
       });
-      setTimeout(() => {
-        let bl = 0;
-        buf.forEach(b => {
-          bl += b.byteLength;
-        });
-        const buffer = new ArrayBuffer(bl);
-        let o = 0;
-        buf.forEach(b => {
-          for (var j = 0; j < b.byteLength; j++) {
-            let fromArrayView = new Uint8Array(b, j, 1);
-            let toArrayView = new Uint8Array(buffer, j + o, 1);
-            toArrayView.set(fromArrayView);
+
+      const intervalId = setInterval(() => {
+        if(buf[0]) {
+          totalSizeOfRequest = _readHeader(buf[0]).totalSizeOfRequest;
+          let bl = 0;
+          buf.forEach(b => {
+            bl += b.byteLength;
+          });
+          if(bl >= totalSizeOfRequest) {
+            const buffer = new ArrayBuffer(bl);
+            let o = 0;
+            buf.forEach(b => {
+              for (let j = 0; j < b.byteLength; j++) {
+                let fromArrayView = new Uint8Array(b, j, 1);
+                let toArrayView = new Uint8Array(buffer, j + o, 1);
+                toArrayView.set(fromArrayView);
+              }
+              o = o + b.byteLength;
+            });
+            clearInterval(intervalId);
+            resolve(buffer);
           }
-          o = o + b.byteLength;
-        });
-        resolve(buffer);
-      }, 3000);
+        }
+        if(count++>timeout) {
+          console.error('time out expired for this TCP request');
+          clearInterval(intervalId);
+        }
+      }, frequency);
     });
   };
 
@@ -598,7 +617,7 @@
   };
 
   const download = e => {
-    return sendToServer_simple(downloadRequest(e)).then(data => {
+    return sendToServer(downloadRequest(e)).then(data => {
       return readResultsList(data);
     });
   };
@@ -621,6 +640,8 @@
     });
   };
 
+  const cancelDownload = (e) => sendToServer(getCancelDownloadRequest(e));
+
   $.connect = connect;
   $.search = search;
   $.fetchSearch = fetchSearch;
@@ -629,5 +650,6 @@
   $.getSharedFiles = getSharedFiles;
   $.clearCompleted = clearCompleted;
   $.getStats = getStats;
+  $.cancelDownload = cancelDownload;
 
 }(typeof exports === 'object' && exports || this));

@@ -29,3 +29,6 @@ aMule.getDownloads().then(listOfFileJSON => {
   // parse json file
 });
 ```
+```javascript
+aMule.download(searchResult);
+```

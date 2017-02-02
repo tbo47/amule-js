@@ -59,7 +59,7 @@
     EC_SEARCH_WEB : 0x03
   };
   const EC_TAG_SEARCHFILE = {
-    EC_TAG_SEARCH_TYPE : 0x0701,
+    EC_TAG_SEARCH_TYPE : 0x0701, //1793/2?
     EC_TAG_SEARCH_NAME : 0x0702,
     EC_TAG_SEARCH_MIN_SIZE : 0x0703,
     EC_TAG_SEARCH_MAX_SIZE : 0x0704,
@@ -143,10 +143,10 @@
       tagLength += Uint8Array.BYTES_PER_ELEMENT;
     }
     else if (ecOp === ECOpCodes.EC_TAGTYPE_HASH16) {
-      for (var i = 0; i < value.length; i = i + 2) {
-        var dv = new DataView(new ArrayBuffer(Uint8Array.BYTES_PER_ELEMENT));
-        var hashValue = parseInt("0x" + value[i] + value[i + 1]);
-        dv.setUint8(0, hashValue);
+      for (let i = 0; i < value.length; i = i + 2) {
+        const dv = new DataView(new ArrayBuffer(Uint8Array.BYTES_PER_ELEMENT));
+        const hashValue = parseInt(value[i] + value[i + 1], 16);
+        dv.setUint8(0, hashValue, false);
         // console.log("hash " + i / 2 + " : " + hashValue);
         $.data.arrayBuffers.push(dv.buffer);
         tagLength += Uint8Array.BYTES_PER_ELEMENT;
@@ -165,14 +165,14 @@
   /**
    * Build request headers
    */
-  const _setHeadersToRequest = function(opCode) {
-    var dv = new DataView(new ArrayBuffer(Uint32Array.BYTES_PER_ELEMENT));
+  const _setHeadersToRequest = opCode => {
+    let dv = new DataView(new ArrayBuffer(Uint32Array.BYTES_PER_ELEMENT));
     // set flags, normal === 32 (34 pour amule-gui)
     dv.setUint32(0, 32, false);
     $.data.arrayBuffers.push(dv.buffer);
     // packet body length, will be set at the end
     $.data.arrayBuffers.push(new ArrayBuffer(Uint32Array.BYTES_PER_ELEMENT));
-    var dv = new DataView(new ArrayBuffer(Uint8Array.BYTES_PER_ELEMENT));
+    dv = new DataView(new ArrayBuffer(Uint8Array.BYTES_PER_ELEMENT));
     dv.setUint8(0, opCode, false);// op code
     $.data.arrayBuffers.push(dv.buffer);
     // tag count, will be set at the end
@@ -239,36 +239,36 @@
   const _getAuthRequest2 = () => {
     _setHeadersToRequest(80);
     let tagCount = 0;
-    _buildTagArrayBuffer(2, ECOpCodes.EC_TAGTYPE_HASH16, $.md5($.data.md5 + $.md5($.data.solt)), null);
+    let passwd = $.md5($.data.md5 + $.md5($.data.solt));
+    _buildTagArrayBuffer(2, ECOpCodes.EC_TAGTYPE_HASH16, passwd, null);
     tagCount++;
     return _finalizeRequest(tagCount);
   };
 
   /**
-   *
+   *  < EC_OP_SEARCH_START opCode:38 size:38 (compressed: 30)
+   *      EC_TAG_SEARCH_TYPE tagName:1793 dataType:2 dataLen:1 = EC_SEARCH_LOCAL
+   *        EC_TAG_SEARCH_NAME tagName:1794 dataType:6 dataLen:10 = keywords 2017
+   *        EC_TAG_SEARCH_FILE_TYPE tagName:1797 dataType:6 dataLen:1 =
+   *  > EC_OP_STRINGS opCode:6 size:59 (compressed: 54)
+   *      EC_TAG_STRING tagName:0 dataType:6 dataLen:49 = Search in progress. Refetch results in a moment!
    */
   const _getSearchStartRequest = q => {
-    _setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_START);
-    var tagCount = 0;
-    var children = [];
-    var searchTag = {
-      "ecTag" : 3588,
-      "ecOp" : ECOpCodes.EC_OP_STRINGS,
-      "value" : q + "\0"
-    };
-    children.push(searchTag);
-    var fileTypeTag = {
-      "ecTag" : EC_TAG_SEARCHFILE.EC_TAG_SEARCH_FILE_TYPE,
-      "ecOp" : ECOpCodes.EC_OP_STRINGS,
-      "value" : "\0"
-    };
-    children.push(fileTypeTag);
-    var fileTypeTag = {
-      "ecTag" : EC_TAG_SEARCHFILE.EC_TAG_SEARCH_EXTENSION,
-      "ecOp" : ECOpCodes.EC_OP_STRINGS,
-      "value" : "mp4\0"
-    };
-    children.push(fileTypeTag);
+    _setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_START); //38
+    let tagCount = 0;
+    const children = [{
+        ecTag : 1794*2,
+        ecOp : ECOpCodes.EC_OP_STRINGS, // 6
+        value : q + "\0"
+      }, {
+        ecTag : EC_TAG_SEARCHFILE.EC_TAG_SEARCH_FILE_TYPE, // 1797*2
+        ecOp : ECOpCodes.EC_OP_STRINGS,
+        value : "\0"
+      }, {
+        ecTag : EC_TAG_SEARCHFILE.EC_TAG_SEARCH_EXTENSION,
+        ecOp : ECOpCodes.EC_OP_STRINGS,
+        value : "mp4\0"
+      }];
 
     _buildTagArrayBuffer(EC_TAG_SEARCHFILE.EC_TAG_SEARCH_TYPE, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, children);
     tagCount++;
@@ -280,10 +280,7 @@
    */
   const getSharedFilesRequest = () => {
     _setHeadersToRequest(ECCodes.EC_OP_GET_SHARED_FILES);
-    var tagCount = 0;
-    // _buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
-    // tagCount++;
-    return _finalizeRequest(tagCount);
+    return _finalizeRequest(0);
   };
 
   /**
@@ -291,18 +288,36 @@
    */
    const getSearchResultRequest = () => {
      _setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_RESULTS);
-     var tagCount = 0;
+     let tagCount = 0;
      _buildTagArrayBuffer(8, ECOpCodes.EC_TAGTYPE_UINT8, EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
      tagCount++;
      return _finalizeRequest(tagCount);
    };
 
-  /**
-   *
-   */
   const getDownloadsRequest = () => {
     _setHeadersToRequest(13); // EC_OP_GET_DLOAD_QUEUE
     return _finalizeRequest(0);
+  };
+
+  /**
+   *  < EC_OP_DOWNLOAD_SEARCH_RESULT opCode:42 size:36 (compressed: 28)
+   *      EC_TAG_PARTFILE tagName:768 dataType:9 dataLen:16 = 26E4413971DF1EC89AC3B91A4A02402F
+   *        EC_TAG_PARTFILE_CAT tagName:783 dataType:2 dataLen:1 = 0
+   *  > EC_OP_STRINGS opCode:6 size:3 (compressed: 2)
+   */
+  const downloadRequest = (e) => {
+    _setHeadersToRequest(ECOpCodes.EC_OP_DOWNLOAD_SEARCH_RESULT);//42
+    let tagCount = 0;
+    const children = [{
+        ecTag : 783*2,
+        ecOp : ECOpCodes.EC_TAGTYPE_UINT8, //2
+        value : 0
+      }];
+
+    // if has children => +1
+    _buildTagArrayBuffer(768*2+1, ECOpCodes.EC_TAGTYPE_HASH16, e.hash, children);
+    tagCount++;
+    return _finalizeRequest(tagCount);
   };
 
   /**
@@ -357,9 +372,9 @@
     offset = offset + Uint32Array.BYTES_PER_ELEMENT;
 
     if ($.data.responseOpcode === 79) {
-      var dv = new DataView(buffer, offset, 8);// 8 bytes
-      for (var i = 0; i < 8; i++) {
-        var c = dv.getUint8(i).toString(16).toUpperCase();
+      const dv = new DataView(buffer, offset, 8);// 8 bytes
+      for (let i = 0; i < 8; i++) {
+        let c = dv.getUint8(i).toString(16).toUpperCase();
         if (c.length < 2 && i !== 0) {
           c = '0' + c;
         }
@@ -375,7 +390,6 @@
    */
   const readBuffer = (buffer, byteNumberToRead, littleEndian = false) => {
     let val = null;
-    // console.log('offset ' + offset);
     try {
       const dataView = new DataView(buffer, offset, byteNumberToRead);
       if(byteNumberToRead === 1) {
@@ -386,7 +400,7 @@
         val = dataView.getUint32(0, littleEndian);
       }
     } catch (err) {
-      console.log(err);
+      console.error(err);
     }
     offset += byteNumberToRead;
     return val;
@@ -418,26 +432,34 @@
           child2.typeEcOp = readBuffer(buffer, 1);
           child2.length = readBuffer(buffer, 4);
           child.childrenLength += ( 7 + child2.length );
-          if (child2.typeEcOp === 2) { // binary
+          child2.value = '';
+          if (child2.typeEcOp === ECOpCodes.EC_TAGTYPE_UINT8) { // 2
             child2.value = readBuffer(buffer, child2.length);
           }
           else if (child2.typeEcOp === 4) { // integer
-            child2.value = '';
             for (var m = 0; m < child2.length; m++) {
               child2.value += "" + readBuffer(buffer, 1);
             }
           }
-          else if (child2.typeEcOp === 6) { // text
-            child2.value = '';
+          else if (child2.typeEcOp === ECOpCodes.EC_OP_STRINGS) { // 6
             for (var m = 0; m < child2.length; m++) {
               child2.value += "" + String.fromCharCode(readBuffer(buffer, 1));
+            }
+          }
+          else if (child2.typeEcOp === ECOpCodes.EC_TAGTYPE_HASH16) { //9
+            for (var m = 0; m < child2.length; m = m + 2) {
+              let c = readBuffer(buffer, 2).toString(16);
+              c = ('0000'+c).slice(-4);
+              child2.value += c;
+            }
+            if(child2.value.length != 32) {
+              console.log('HASH is false: ' + child2.value + ' -- '+  + child2.value.length);
             }
           }
           else {
             // console.log('WARNING: not read : child2.typeEcOp = ' + child2.typeEcOp);
             // TODO 
             // wrong but we do it to read the buffer
-            child2.value = '';
             for (var m = 0; m < child2.length; m++) {
               child2.value += "" + readBuffer(buffer, 1);
             }
@@ -474,7 +496,6 @@
       } else if (res.opCode === 40) {
         res.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
       }
-      console.log(res);
 
       readBufferChildren(buffer, res);
       res.children.forEach(e => {
@@ -495,7 +516,6 @@
           });
         }
       });
-      console.log(res);
       resolve(res);
     });
   };
@@ -538,7 +558,6 @@
           }
           o = o + b.byteLength;
         });
-        console.log('response size in bit: '+ o + ' number of packet: ' + buf.length);
         resolve(buffer);
       }, 3000);
     });
@@ -569,10 +588,17 @@
    */
   const search = q => sendToServer(_getSearchStartRequest(q));
 
-  const fetchSearch = () => sendToServer(getSearchResultRequest()).then(data => readResultsList(data));
+  const fetchSearch = () => sendToServer(getSearchResultRequest())
+    .then(data => readResultsList(data));
 
   const getDownloads = () => {
     return sendToServer(getDownloadsRequest()).then(data => {
+      return readResultsList(data);
+    });
+  };
+
+  const download = e => {
+    return sendToServer_simple(downloadRequest(e)).then(data => {
       return readResultsList(data);
     });
   };
@@ -599,6 +625,7 @@
   $.search = search;
   $.fetchSearch = fetchSearch;
   $.getDownloads = getDownloads;
+  $.download = download;
   $.getSharedFiles = getSharedFiles;
   $.clearCompleted = clearCompleted;
   $.getStats = getStats;

@@ -4,13 +4,11 @@
 (function(exports) {
   'use strict';
 
-  var $ = exports.aMule = {};
+  let $ = exports.aMule = {};
   $.data = {
     isConnected: false
   };
-  var offset = 0;
-  var socketId;
-  const textDecoder = new TextDecoder('iso-8859-1'); // utf-8 iso-8859-1
+  let offset = 0;
 
   const _init = (password, md5) => {
     $.md5 = md5;
@@ -188,28 +186,28 @@
    */
   const _finalizeRequest = tagCount => {
     // calculating the buffer length in bytes
-    var bufferLength = 0;
-    for (var i = 0; i < $.data.arrayBuffers.length; i++) {
+    let bufferLength = 0;
+    for (let i = 0; i < $.data.arrayBuffers.length; i++) {
       bufferLength = bufferLength + $.data.arrayBuffers[i].byteLength;
     }
     // creating ArrayBuffer with all the DataViews above
-    var buffer = new ArrayBuffer(bufferLength);
-    var offset = 0;
-    for (var i = 0; i < $.data.arrayBuffers.length; i++) {
-      for (var j = 0; j < $.data.arrayBuffers[i].byteLength; j++) {
-        var fromArrayView = new Uint8Array($.data.arrayBuffers[i], j, 1);
-        var toArrayView = new Uint8Array(buffer, j + offset, 1);
+    const buffer = new ArrayBuffer(bufferLength);
+    let offset = 0;
+    for (let i = 0; i < $.data.arrayBuffers.length; i++) {
+      for (let j = 0; j < $.data.arrayBuffers[i].byteLength; j++) {
+        const fromArrayView = new Uint8Array($.data.arrayBuffers[i], j, 1);
+        const toArrayView = new Uint8Array(buffer, j + offset, 1);
         toArrayView.set(fromArrayView);
       }
       offset = offset + $.data.arrayBuffers[i].byteLength;
     }
     $.data.arrayBuffers = [];
     // set body length
-    var bodyLengthDataView = new DataView(buffer, Uint32Array.BYTES_PER_ELEMENT, Uint32Array.BYTES_PER_ELEMENT);
+    const bodyLengthDataView = new DataView(buffer, Uint32Array.BYTES_PER_ELEMENT, Uint32Array.BYTES_PER_ELEMENT);
     bodyLengthDataView.setUint32(0, buffer.byteLength - Uint32Array.BYTES_PER_ELEMENT * 2, false);
     // console.log('> body length: '+ (buffer.byteLength - Uint32Array.BYTES_PER_ELEMENT * 2));
     // set tag count
-    var tagNumberDataView = new DataView(buffer, Uint32Array.BYTES_PER_ELEMENT * 2 + Uint8Array.BYTES_PER_ELEMENT, Uint16Array.BYTES_PER_ELEMENT);
+    const tagNumberDataView = new DataView(buffer, Uint32Array.BYTES_PER_ELEMENT * 2 + Uint8Array.BYTES_PER_ELEMENT, Uint16Array.BYTES_PER_ELEMENT);
     tagNumberDataView.setUint16(0, tagCount, false);
     return buffer;
   };
@@ -253,6 +251,13 @@
    *        EC_TAG_SEARCH_FILE_TYPE tagName:1797 dataType:6 dataLen:1 =
    *  > EC_OP_STRINGS opCode:6 size:59 (compressed: 54)
    *      EC_TAG_STRING tagName:0 dataType:6 dataLen:49 = Search in progress. Refetch results in a moment!
+   * 
+   * or
+   * 
+   *  < EC_OP_SEARCH_START opCode:38 size:38 (compressed: 30)
+   *      EC_TAG_SEARCH_TYPE tagName:1793 dataType:2 dataLen:1 = EC_SEARCH_KAD
+   *        EC_TAG_SEARCH_NAME tagName:1794 dataType:6 dataLen:10 = keywords 2017
+   *        EC_TAG_SEARCH_FILE_TYPE tagName:1797 dataType:6 dataLen:1 =
    */
   const _getSearchStartRequest = q => {
     _setHeadersToRequest(ECOpCodes.EC_OP_SEARCH_START); //38
@@ -426,13 +431,14 @@
         child.tagCountInResponse = readBuffer(buffer, 2);
         child.children = [];
         child.childrenLength = 0;
-        for (var i = 0; i < child.tagCountInResponse; i++) {
-          var child2 = {};
+        for (let i = 0; i < child.tagCountInResponse; i++) {
+          const child2 = {};
           child2.nameEcTag = readBuffer(buffer, 2)/2; // TODO if odd?
           child2.typeEcOp = readBuffer(buffer, 1);
           child2.length = readBuffer(buffer, 4);
           child.childrenLength += ( 7 + child2.length );
           child2.value = '';
+          let writingSpecialUTF8 = 0;
           if (child2.typeEcOp === ECOpCodes.EC_TAGTYPE_UINT8) { // 2
             child2.value = readBuffer(buffer, child2.length);
           }
@@ -442,9 +448,26 @@
             }
           }
           else if (child2.typeEcOp === ECOpCodes.EC_OP_STRINGS) { // 6
+            let textDecoder = null;
+            if(typeof TextDecoder !== 'undefined') {
+              textDecoder = new TextDecoder();//'utf-8'
+            }
             for (let m = 0; m < child2.length; m++) {
-              child2.value += textDecoder.decode(new DataView(buffer, offset++, 1));
-              // child2.value += "" + String.fromCharCode(readBuffer(buffer, 1));
+              let intValue = readBuffer(buffer, 1);
+              if(intValue < 0x80) {
+                child2.value += "" + String.fromCharCode(intValue);
+              } else {
+                // utf-8 char can be on 2 bytes
+                if(writingSpecialUTF8++ > 0) {
+                  let dv = new DataView(buffer, offset-2, 2);
+                  if(textDecoder) {
+                    child2.value += textDecoder.decode(dv);
+                  } else { // TODO fix NodeJs char problem
+                    child2.value += String.fromCharCode(dv);
+                  }
+                  writingSpecialUTF8 = 0;
+                }
+              }
             }
           }
           else if (child2.typeEcOp === ECOpCodes.EC_TAGTYPE_HASH16) { //9
@@ -514,7 +537,7 @@
               e.hash = m.value;
             }
             if(m.nameEcTag === 771) { // EC_TAG_PARTFILE_SIZE_FULL
-              e.size = m.value;
+              e.size = parseInt(m.value);
             }
             if(m.nameEcTag === 782) { // EC_TAG_PARTFILE_ED2K_LINK
               e.edkLink = m.value;
@@ -526,19 +549,42 @@
     });
   };
 
-  const initConnToServer = (ip, port) => {
+  let net = null; // node net module
+  let client = null; // node socket
+  let socketId; // chrome API socket id
+
+  function toBuffer(ab) {
+    return new Buffer(new Uint8Array(ab));
+  }
+
+  function toArrayBuffer(buf) {
+    return new Uint8Array(buf).buffer;
+  }
+
+  function initConnToServer (ip, port) {
     return new Promise((resolve, reject) => {
-      chrome.sockets.tcp.create({}, createInfo => {
-        socketId = createInfo.socketId;
-        chrome.sockets.tcp.connect(createInfo.socketId, ip, port, code => resolve(code));
-      });
+      if(typeof chrome !== 'undefined') {
+        chrome.sockets.tcp.create({}, r => {
+          socketId = r.socketId;
+          chrome.sockets.tcp.connect(r.socketId, ip, port, code => resolve(code));
+        });
+      } else {
+        client = new net.Socket(); // return a Node socket
+        client.connect(port, ip);
+        client.on('connect', () => resolve());
+      }
     });
   };
 
-  const sendToServer_simple = data => {
+  function sendToServer_simple (data) {
     return new Promise((resolve, reject) => {
-      chrome.sockets.tcp.send(socketId, data, sendInfo => {});
-      chrome.sockets.tcp.onReceive.addListener(receiveInfo => resolve(receiveInfo.data));
+      if(typeof chrome !== 'undefined') {
+        chrome.sockets.tcp.send(socketId, data, r => {});
+        chrome.sockets.tcp.onReceive.addListener(receiveInfo => resolve(receiveInfo.data));
+      } else {
+        client.write(toBuffer(data));
+        client.on('data', data => resolve(toArrayBuffer(data)));
+      }
     });
   };
 
@@ -547,10 +593,13 @@
 
       let buf = [], totalSizeOfRequest, frequency = 100, timeout = 200, count = 0;
 
-      chrome.sockets.tcp.send(socketId, data, info => {});
-      chrome.sockets.tcp.onReceive.addListener(info => {
-        buf.push(info.data);
-      });
+      if(typeof chrome !== 'undefined') {
+        chrome.sockets.tcp.send(socketId, data, r => {});
+        chrome.sockets.tcp.onReceive.addListener(r => buf.push(r.data));
+      } else {
+        client.write(toBuffer(data));
+        client.on('data', data => buf.push(toArrayBuffer(data)));
+      }
 
       const intervalId = setInterval(() => {
         if(buf[0]) {
@@ -598,7 +647,7 @@
       }
     })
     .catch(err => {
-      throw('You are NOT connected to amule: ' + err);
+      throw('\n\nYou are NOT connected to amule: ' + err);
     });
   };
 
@@ -651,5 +700,6 @@
   $.clearCompleted = clearCompleted;
   $.getStats = getStats;
   $.cancelDownload = cancelDownload;
+  $.initNetModule = n => net = n;
 
 }(typeof exports === 'object' && exports || this));

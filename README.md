@@ -1,37 +1,21 @@
 # amule-js
 
-It exposes a couple of javascript [promises](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) to interact with amule.
+Amule-js is a typescript and/or javascript (ES6) library to communicate with [amule](https://en.wikipedia.org/wiki/AMule).
 
-It works for [chrome-apps](https://developer.chrome.com/apps/about_apps), [nw.js](https://nwjs.io/), [node.js](https://nodejs.org/) or [electron](http://electron.atom.io/).
+It works with [chrome-apps](https://developer.chrome.com/apps/about_apps), [nw.js](https://nwjs.io/), [node.js](https://nodejs.org/) or [electron](http://electron.atom.io/).
 
-amule-js-node-example.js is an simple example written in nodejs.
+amule-js-node-ex1.js is an simple example written for nodejs.
 
 ## API
 
 ```javascript
-aMule.connect('127.0.0.1', 4712, 'password', md5).then(m => console.log('You are connected to amule'));
-```
+let aMule = new aMuleModule.AMuleCli('127.0.0.1', 4712, 'password', md5);
 
-```javascript
-aMule.getSharedFiles().then(list => console.log(list));
-```
+aMule.connect().then(m => {
 
-```javascript
-aMule.search('search key words');
-```
+  aMule.getSharedFiles().then(res => {
+    res.children.forEach(e => console.log(e.value));
+  });
 
-```javascript
-aMule.fetchSearch().then(list => console.log(list));
-```
-
-```javascript
-aMule.getDownloads().then(list => console.log(list));
-```
-
-```javascript
-aMule.download(searchResultElement);
-```
-
-```javascript
-aMule.cancelDownload(element);
+});
 ```

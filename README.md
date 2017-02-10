@@ -10,6 +10,7 @@ amule-js-node-ex1.js is an simple example written for nodejs.
 
 ```javascript
 let aMule = new aMuleModule.AMuleCli('127.0.0.1', 4712, 'password', md5);
+aMule.setTextDecoder(new TextDecoder());
 
 aMule.connect().then(m => {
 

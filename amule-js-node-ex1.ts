@@ -1,6 +1,6 @@
 import aMuleModule = require('./amule-ts');
 const md5 = require('./node_modules/blueimp-md5/js/md5.js');
-
+const StringDecoder = require('string_decoder').StringDecoder;
 /**
  * 
  * Run 
@@ -10,6 +10,8 @@ const md5 = require('./node_modules/blueimp-md5/js/md5.js');
  */
 
 let aMule = new aMuleModule.AMuleCli('192.168.0.104', 4712, 'tttttt', md5);
+
+aMule.setStringDecoder(new StringDecoder('utf8'));
 
 aMule.connect().then(m => {
 

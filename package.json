@@ -23,8 +23,9 @@
     "amule"
   ],
   "scripts": {
-    "start": "npm run build:ex1",
+    "start": "npm run js ; npm run build:ex1",
     "build:ex1": "nodemon -e \"ts\" --exec \"./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node ./amule-js-node-ex1.ts\"",
-    "build:ex2": "nodemon -e \"ts\" --exec \"./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node ./amule-js-node-ex1.ts\""
+    "build:ex2": "nodemon -e \"ts\" --exec \"./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node ./amule-js-node-ex1.ts\"",
+    "js": "head -n -1 amule-ts.js > amule-js.js ; tail -n +4 amule-js.js > tmp.js ; mv tmp.js amule-js.js"
   }
 }

@@ -72,6 +72,12 @@ var AMuleCli = (function () {
     AMuleCli.prototype.md5 = function (str) {
         return this.md5Function(str);
     };
+    AMuleCli.prototype.setTextDecoder = function (textDecoder) {
+        this.textDecoder = textDecoder;
+    };
+    AMuleCli.prototype.setStringDecoder = function (stringDecoder) {
+        this.stringDecoder = stringDecoder;
+    };
     /**
      * Used internally to build a request
      */
@@ -373,9 +379,6 @@ var AMuleCli = (function () {
         return this._finalizeRequest(1);
     };
     ;
-    /**
-     *
-     */
     AMuleCli.prototype.readSalt = function (buffer) {
         var offset = Uint32Array.BYTES_PER_ELEMENT * 2;
         var dataView = new DataView(buffer, offset, Uint8Array.BYTES_PER_ELEMENT);
@@ -404,26 +407,18 @@ var AMuleCli = (function () {
         return this.responseOpcode;
     };
     ;
-    /**
-     *
-     */
     AMuleCli.prototype.readBuffer = function (buffer, byteNumberToRead, littleEndian) {
         if (littleEndian === void 0) { littleEndian = false; }
         var val = null;
-        try {
-            var dataView = new DataView(buffer, this.offset, byteNumberToRead);
-            if (byteNumberToRead === 1) {
-                val = dataView.getUint8(0);
-            }
-            else if (byteNumberToRead === 2) {
-                val = dataView.getUint16(0, littleEndian);
-            }
-            else if (byteNumberToRead === 4) {
-                val = dataView.getUint32(0, littleEndian);
-            }
+        var dataView = new DataView(buffer, this.offset, byteNumberToRead);
+        if (byteNumberToRead === 1) {
+            val = dataView.getUint8(0);
         }
-        catch (err) {
-            console.error(err);
+        else if (byteNumberToRead === 2) {
+            val = dataView.getUint16(0, littleEndian);
+        }
+        else if (byteNumberToRead === 4) {
+            val = dataView.getUint32(0, littleEndian);
         }
         this.offset += byteNumberToRead;
         return val;
@@ -431,6 +426,7 @@ var AMuleCli = (function () {
     ;
     AMuleCli.prototype.readBufferChildren = function (buffer, res) {
         var children = [];
+        var lengthCountDown;
         for (var j = 0; j < res.tagCountInResponse; j++) {
             var child = {
                 nameEcTag: this.readBuffer(buffer, 2),
@@ -440,15 +436,19 @@ var AMuleCli = (function () {
                 children: [],
                 value: null
             };
+            lengthCountDown = child.length;
             // console.log('(child.length + offset): ' + (child.length + offset) + ' bytes, totalSizeOfRequest' + totalSizeOfRequest);
             if (child.length + this.offset > res.totalSizeOfRequest) {
-                console.log('ERROR: should not happen');
+                console.error('ERROR: should not happen');
                 return res;
             }
             // if name (ecTag) is odd there is a child count
             if (child.nameEcTag % 2) {
                 child.nameEcTag = (child.nameEcTag - 1) / 2;
                 child.tagCountInResponse = this.readBuffer(buffer, 2);
+                if (child.tagCountInResponse > 0) {
+                    console.error('not yet implemented. Can t read those children: ' + child.tagCountInResponse);
+                }
             }
             else {
                 child.nameEcTag = child.nameEcTag / 2;
@@ -470,8 +470,15 @@ var AMuleCli = (function () {
         return children;
     };
     ;
+    AMuleCli.prototype.uintToString = function (uintArray) {
+        var encodedString = String.fromCharCode.apply(null, uintArray), decodedString = decodeURIComponent(encodedString);
+        return decodedString;
+    };
+    /**
+     * Read the value of a node according to its type (typeEcOp) and size in the buffer
+     * @returns value
+     */
     AMuleCli.prototype.readValueOfANode = function (child2, buffer) {
-        var writingSpecialUTF8 = 0;
         if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT8) {
             child2.value = this.readBuffer(buffer, child2.length);
         }
@@ -481,28 +488,27 @@ var AMuleCli = (function () {
             }
         }
         else if (child2.typeEcOp === this.ECOpCodes.EC_OP_STRINGS) {
-            var textDecoder = null;
-            /*
-            if (typeof TextDecoder !== 'undefined') {
-                textDecoder = new TextDecoder();//'utf-8'
+            if (!this.textDecoder && typeof this.stringDecoder === 'undefined') {
+                console.log("you won't be able to read special utf-8 char");
             }
-            */
+            var uint8array = [];
             for (var m_2 = 0; m_2 < child2.length; m_2++) {
                 var intValue = this.readBuffer(buffer, 1);
-                if (intValue < 0x80) {
-                    child2.value += "" + String.fromCharCode(intValue);
+                if (intValue > 0x80) {
+                    uint8array.push(intValue);
+                }
+                else if (uint8array.length > 0) {
+                    if (this.textDecoder) {
+                        child2.value += this.textDecoder.decode(new Uint8Array(uint8array));
+                    }
+                    else if (this.stringDecoder) {
+                        child2.value += this.stringDecoder.write(Buffer.from(uint8array));
+                    }
+                    uint8array = [];
+                    child2.value += '' + String.fromCharCode(intValue);
                 }
                 else {
-                    // utf-8 char can be on 2 bytes
-                    if (writingSpecialUTF8++ > 0) {
-                        var dv = new DataView(buffer, this.offset - 2, 2);
-                        if (textDecoder) {
-                            child2.value += textDecoder.decode(dv);
-                        }
-                        else {
-                        }
-                        writingSpecialUTF8 = 0;
-                    }
+                    child2.value += '' + String.fromCharCode(intValue);
                 }
             }
         }
@@ -532,9 +538,9 @@ var AMuleCli = (function () {
         response.header = this.readBuffer(buffer, 4);
         // length (total minus header and response Length)
         var responseLength = this.readBuffer(buffer, 4);
-        // response length (total minus header, response length, opcode, tag count)
-        // res.responseLength = responseLength - 3;
         response.totalSizeOfRequest = responseLength + 8;
+        // children response length (total minus header, response length, opcode, tag count)
+        response.length = responseLength - 3;
         response.opCode = this.readBuffer(buffer, 1);
         response.tagCountInResponse = this.readBuffer(buffer, 2);
         return response;

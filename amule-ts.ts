@@ -28,6 +28,8 @@ export class AMuleCli {
     private md5Password: string; // md5 value of the password
     private solt: string = '';// solt number (sessions id)
     private md5Function;// function to md5()
+    private textDecoder;
+    private stringDecoder;
 
     constructor(ip: string, port: number, password: string, md5Function) {
         this.ip = ip;
@@ -36,8 +38,17 @@ export class AMuleCli {
         // must be the same as ECPassword in .aMule/amule.conf
         this.md5Password = this.md5(password);
     }
+
     private md5(str: string) {
         return this.md5Function(str);
+    }
+
+    public setTextDecoder(textDecoder) {
+        this.textDecoder = textDecoder;
+    }
+
+    public setStringDecoder(stringDecoder) {
+        this.stringDecoder = stringDecoder;
     }
 
     /**
@@ -443,7 +454,7 @@ export class AMuleCli {
     private readBufferChildren(buffer, res) {
 
         const children = [];
-        let lengthCountDown:number;
+        let lengthCountDown: number;
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
             const child = {
@@ -490,9 +501,16 @@ export class AMuleCli {
         }
         return children;
     };
-
+    private uintToString(uintArray) {
+        var encodedString = String.fromCharCode.apply(null, uintArray),
+            decodedString = decodeURIComponent(encodedString);
+        return decodedString;
+    }
+    /**
+     * Read the value of a node according to its type (typeEcOp) and size in the buffer
+     * @returns value
+     */
     private readValueOfANode(child2, buffer) {
-        let writingSpecialUTF8 = 0;
         if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT8) { // 2
             child2.value = this.readBuffer(buffer, child2.length);
         }
@@ -502,27 +520,24 @@ export class AMuleCli {
             }
         }
         else if (child2.typeEcOp === this.ECOpCodes.EC_OP_STRINGS) { // 6
-            let textDecoder = null;
-            /*
-            if (typeof TextDecoder !== 'undefined') {
-                textDecoder = new TextDecoder();//'utf-8'
+            if (!this.textDecoder && typeof this.stringDecoder === 'undefined') {
+                console.log("you won't be able to read special utf-8 char");
             }
-            */
+            let uint8array: number[] = [];
             for (let m = 0; m < child2.length; m++) {
                 let intValue = this.readBuffer(buffer, 1);
-                if (intValue < 0x80) {
-                    child2.value += "" + String.fromCharCode(intValue);
-                } else {
-                    // utf-8 char can be on 2 bytes
-                    if (writingSpecialUTF8++ > 0) {
-                        let dv: DataView = new DataView(buffer, this.offset - 2, 2);
-                        if (textDecoder) {
-                            child2.value += textDecoder.decode(dv);
-                        } else { // TODO fix NodeJs char problem
-                            //child2.value += String.fromCharCode(dv);
-                        }
-                        writingSpecialUTF8 = 0;
+                if (intValue > 0x80) {// wired utf-8 char
+                    uint8array.push(intValue);
+                } else if (uint8array.length > 0) {// end of wired utf-8 char
+                    if (this.textDecoder) { // browser
+                        child2.value += this.textDecoder.decode(new Uint8Array(uint8array));
+                    } else if (this.stringDecoder) {// nodeJs
+                        child2.value += this.stringDecoder.write(Buffer.from(uint8array));
                     }
+                    uint8array = [];
+                    child2.value += '' + String.fromCharCode(intValue); // work for all javascript engine
+                } else {
+                    child2.value += '' + String.fromCharCode(intValue);
                 }
             }
         }

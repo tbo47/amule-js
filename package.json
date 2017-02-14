@@ -4,14 +4,14 @@
   "description": "javascript client for amule",
   "main": "amule-js.js",
   "dependencies": {
-    "@types/chrome": "0.0.38",
-    "@types/es6-promise": "0.0.32",
-    "@types/node": "^7.0.5",
     "blueimp-md5": "^2.3.0"
   },
   "devDependencies": {
     "nodemon": "^1.11.0",
     "ts-node": "^2.0.0",
+    "@types/chrome": "0.0.38",
+    "@types/es6-promise": "0.0.32",
+    "@types/node": "^7.0.5",
     "typescript": "^2.1.5"
   },
   "repository": {
@@ -22,6 +22,7 @@
     "javascript",
     "amule"
   ],
+  "license": "MIT",
   "scripts": {
     "start": "npm run js ; npm run build:ex1",
     "build:ex1": "nodemon -e \"ts\" --exec \"./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node ./amule-js-node-ex1.ts\"",

@@ -350,6 +350,8 @@ var AMuleCli = (function () {
     };
     ;
     /**
+     * EC_OP_STAT_REQ == 10 for a short summary
+     * EC_OP_GET_UPDATE == 82  for the list of dl and ul files
      *
      * < EC_OP_STAT_REQ opCode:10 size:11 (compressed: 6)
      *     EC_TAG_DETAIL_LEVEL tagName:4 dataType:2 dataLen:1 = EC_DETAIL_INC_UPDATE
@@ -359,8 +361,9 @@ var AMuleCli = (function () {
      *     EC_TAG_STATS_BANNED_COUNT tagName:519 dataType:2 dataLen:1 = 0
      *     ...
      */
-    AMuleCli.prototype.getStatsRequest = function () {
-        this._setHeadersToRequest(10); // EC_OP_STAT_REQ
+    AMuleCli.prototype.getStatsRequest = function (EC_OP) {
+        if (EC_OP === void 0) { EC_OP = 10; }
+        this._setHeadersToRequest(EC_OP); // EC_OP_STAT_REQ == 10
         var tagCount = 0;
         var EC_TAG_DETAIL_LEVEL = 4;
         var EC_DETAIL_INC_UPDATE = 4;
@@ -429,7 +432,7 @@ var AMuleCli = (function () {
         var lengthCountDown;
         for (var j = 0; j < res.tagCountInResponse; j++) {
             var child = {
-                nameEcTag: this.readBuffer(buffer, 2),
+                nameEcTag: parseInt(this.readBuffer(buffer, 2)),
                 typeEcOp: this.readBuffer(buffer, 1),
                 length: this.readBuffer(buffer, 4),
                 tagCountInResponse: 0,
@@ -446,25 +449,33 @@ var AMuleCli = (function () {
             if (child.nameEcTag % 2) {
                 child.nameEcTag = (child.nameEcTag - 1) / 2;
                 child.tagCountInResponse = this.readBuffer(buffer, 2);
-                if (child.tagCountInResponse > 0) {
-                    console.error('not yet implemented. Can t read those children: ' + child.tagCountInResponse);
-                }
             }
             else {
                 child.nameEcTag = child.nameEcTag / 2;
             }
             for (var i = 0; i < child.tagCountInResponse; i++) {
                 var child2 = {
-                    nameEcTag: this.readBuffer(buffer, 2) / 2,
+                    nameEcTag: parseInt(this.readBuffer(buffer, 2)),
                     typeEcOp: this.readBuffer(buffer, 1),
                     length: this.readBuffer(buffer, 4),
+                    tagCountInResponse: 0,
                     value: ''
                 };
                 child.length -= (7 + child2.length);
+                if (child2.nameEcTag % 2) {
+                    child2.nameEcTag = (child2.nameEcTag - 1) / 2;
+                    //child2.tagCountInResponse = this.readBuffer(buffer, 2);
+                    if (child2.tagCountInResponse > 0) {
+                    }
+                }
+                else {
+                    child2.nameEcTag = child2.nameEcTag / 2;
+                }
                 this.readValueOfANode(child2, buffer);
                 child.children.push(child2);
             }
             child.value = this.readValueOfANode(child, buffer);
+            //console.log(child.value);
             children.push(child);
         }
         return children;
@@ -505,7 +516,7 @@ var AMuleCli = (function () {
                         child2.value += this.stringDecoder.write(Buffer.from(uint8array));
                     }
                     uint8array = [];
-                    child2.value += '' + String.fromCharCode(intValue);
+                    child2.value += '' + String.fromCharCode(intValue); // work for all javascript engine
                 }
                 else {
                     child2.value += '' + String.fromCharCode(intValue);
@@ -776,11 +787,14 @@ var AMuleCli = (function () {
     AMuleCli.prototype.getSharedFiles = function () {
         return this.sendToServerWhenAvalaible(this.getSharedFilesRequest());
     };
+    AMuleCli.prototype.getDetailUpdate = function () {
+        return this.sendToServerWhenAvalaible(this.getStatsRequest(82));
+    };
     AMuleCli.prototype.clearCompleted = function () {
         return this.sendToServerWhenAvalaible(this.clearCompletedRequest());
     };
     AMuleCli.prototype.getStats = function () {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest());
+        return this.sendToServerWhenAvalaible(this.getStatsRequest(10));
     };
     AMuleCli.prototype.cancelDownload = function (e) {
         return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e));

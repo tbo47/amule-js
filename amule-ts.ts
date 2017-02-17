@@ -343,7 +343,7 @@ export class AMuleCli {
         tagCount++;
         return this._finalizeRequest(tagCount);
     };
-
+    
     private getDownloadsRequest() {
         this._setHeadersToRequest(13); // EC_OP_GET_DLOAD_QUEUE
         return this._finalizeRequest(0);
@@ -379,7 +379,9 @@ export class AMuleCli {
     };
 
     /**
-     *
+     * EC_OP_STAT_REQ == 10 for a short summary
+     * EC_OP_GET_UPDATE == 82  for the list of dl and ul files
+     * 
      * < EC_OP_STAT_REQ opCode:10 size:11 (compressed: 6)
      *     EC_TAG_DETAIL_LEVEL tagName:4 dataType:2 dataLen:1 = EC_DETAIL_INC_UPDATE
      * > EC_OP_STATS opCode:12 size:316 (compressed: 215)
@@ -388,8 +390,8 @@ export class AMuleCli {
      *     EC_TAG_STATS_BANNED_COUNT tagName:519 dataType:2 dataLen:1 = 0
      *     ...
      */
-    private getStatsRequest() {
-        this._setHeadersToRequest(10); // EC_OP_STAT_REQ
+    private getStatsRequest(EC_OP = 10) {
+        this._setHeadersToRequest(EC_OP); // EC_OP_STAT_REQ == 10
         let tagCount = 0;
         const EC_TAG_DETAIL_LEVEL = 4;
         const EC_DETAIL_INC_UPDATE = 4;
@@ -458,7 +460,7 @@ export class AMuleCli {
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
             const child = {
-                nameEcTag: this.readBuffer(buffer, 2),
+                nameEcTag: parseInt(this.readBuffer(buffer, 2)),
                 typeEcOp: this.readBuffer(buffer, 1),
                 length: this.readBuffer(buffer, 4), // length without ectag, ecOp, length and tag count BUT with children length
                 tagCountInResponse: 0,
@@ -477,26 +479,34 @@ export class AMuleCli {
             if (child.nameEcTag % 2) {
                 child.nameEcTag = (child.nameEcTag - 1) / 2;
                 child.tagCountInResponse = this.readBuffer(buffer, 2);
-                if (child.tagCountInResponse > 0) {
-                    console.error('not yet implemented. Can t read those children: ' + child.tagCountInResponse);
-                }
             } else {
                 child.nameEcTag = child.nameEcTag / 2;
             }
 
             for (let i = 0; i < child.tagCountInResponse; i++) {
                 const child2 = {
-                    nameEcTag: this.readBuffer(buffer, 2) / 2, // TODO if odd?
+                    nameEcTag: parseInt(this.readBuffer(buffer, 2)),
                     typeEcOp: this.readBuffer(buffer, 1),
                     length: this.readBuffer(buffer, 4),
+                    tagCountInResponse: 0,
                     value: ''
                 };
                 child.length -= (7 + child2.length);
+                if (child2.nameEcTag % 2) {
+                    child2.nameEcTag = (child2.nameEcTag - 1) / 2;
+                    //child2.tagCountInResponse = this.readBuffer(buffer, 2);
+                    if (child2.tagCountInResponse > 0) {
+                    //    console.log('not yet implemented. Can t read those children: ' + child2.tagCountInResponse);
+                    }
+                } else {
+                    child2.nameEcTag = child2.nameEcTag / 2;
+                }
                 this.readValueOfANode(child2, buffer);
                 child.children.push(child2);
             }
 
             child.value = this.readValueOfANode(child, buffer);
+            //console.log(child.value);
             children.push(child);
         }
         return children;
@@ -803,11 +813,14 @@ export class AMuleCli {
     public getSharedFiles(): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getSharedFilesRequest());
     }
+    public getDetailUpdate(): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getStatsRequest(82));
+    }
     public clearCompleted(): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.clearCompletedRequest());
     }
     public getStats(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest());
+        return this.sendToServerWhenAvalaible(this.getStatsRequest(10));
     }
     public cancelDownload(e): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e));

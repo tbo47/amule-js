@@ -9,7 +9,7 @@ const StringDecoder = require('string_decoder').StringDecoder;
  * 
  */
 
-let aMule = new aMuleModule.AMuleCli('192.168.0.104', 4712, 'tttttt', md5);
+let aMule = new aMuleModule.AMuleCli('127.0.0.1', 4712, 'password', md5);
 
 aMule.setStringDecoder(new StringDecoder('utf8'));
 
@@ -17,16 +17,7 @@ aMule.connect().then(m => {
 
   console.log(m);
   
-  aMule.getStats().then(res => {
-    console.log(res);
-  });
-
   aMule.getSharedFiles().then(res => {
-    res.children.forEach(e => console.log(e.value));
-    console.log('----------------------------------------------');
-  });
-
-  aMule.getDownloads().then(res => {
     res.children.forEach(e => console.log(e.value));
   });
 

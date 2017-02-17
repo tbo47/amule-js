@@ -4,7 +4,13 @@ Amule-js is a typescript and/or javascript (ES6) library to communicate with [am
 
 It works with [chrome-apps](https://developer.chrome.com/apps/about_apps), [nw.js](https://nwjs.io/), [node.js](https://nodejs.org/) or [electron](http://electron.atom.io/).
 
-amule-js-node-ex1.js is an simple example written for nodejs.
+## Example in  nodejs
+
+Run an example on node:
+
+```
+npm install && npm start
+```
 
 ## API
 

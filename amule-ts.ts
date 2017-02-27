@@ -343,7 +343,7 @@ export class AMuleCli {
         tagCount++;
         return this._finalizeRequest(tagCount);
     };
-    
+
     private getDownloadsRequest() {
         this._setHeadersToRequest(13); // EC_OP_GET_DLOAD_QUEUE
         return this._finalizeRequest(0);
@@ -453,26 +453,26 @@ export class AMuleCli {
         return val;
     };
 
-    private readBufferChildren(buffer, res) {
+    private readBufferChildren(buffer, res, recursivity = 1) {
 
         const children = [];
-        let lengthCountDown: number;
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
             const child = {
-                nameEcTag: parseInt(this.readBuffer(buffer, 2)),
+                nameEcTag: this.readBuffer(buffer, 2),
                 typeEcOp: this.readBuffer(buffer, 1),
                 length: this.readBuffer(buffer, 4), // length without ectag, ecOp, length and tag count BUT with children length
                 tagCountInResponse: 0,
                 children: [],
                 value: null
             };
-            lengthCountDown = child.length;
 
             // console.log('(child.length + offset): ' + (child.length + offset) + ' bytes, totalSizeOfRequest' + totalSizeOfRequest);
-            if (child.length + this.offset > res.totalSizeOfRequest) {
-                console.error('ERROR: should not happen');
-                return res;
+            if (res.totalSizeOfRequest && child.length + this.offset > res.totalSizeOfRequest) {
+                console.log('ERROR: child.length + this.offset > res.totalSizeOfRequest');
+                console.log(child);
+                console.log(children);
+                return children;
             }
 
             // if name (ecTag) is odd there is a child count
@@ -482,31 +482,53 @@ export class AMuleCli {
             } else {
                 child.nameEcTag = child.nameEcTag / 2;
             }
-
+            if (child.tagCountInResponse > 0) {
+                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
+            }
             for (let i = 0; i < child.tagCountInResponse; i++) {
                 const child2 = {
                     nameEcTag: parseInt(this.readBuffer(buffer, 2)),
                     typeEcOp: this.readBuffer(buffer, 1),
                     length: this.readBuffer(buffer, 4),
                     tagCountInResponse: 0,
+                    children: [],
                     value: ''
                 };
                 child.length -= (7 + child2.length);
-                if (child2.nameEcTag % 2) {
+                if (child2.nameEcTag % 2 && child2.nameEcTag !== 1579) {
                     child2.nameEcTag = (child2.nameEcTag - 1) / 2;
-                    //child2.tagCountInResponse = this.readBuffer(buffer, 2);
+                    console.log(child2.nameEcTag);
+                    child2.tagCountInResponse = this.readBuffer(buffer, 2);
                     if (child2.tagCountInResponse > 0) {
-                    //    console.log('not yet implemented. Can t read those children: ' + child2.tagCountInResponse);
+                        console.log(recursivity + ' child2.tagCountInResponse ' + child2.tagCountInResponse);
+                        //this.offset += 4 * child2.tagCountInResponse;
+                        child2.children = this.readBufferChildren(buffer, child2, recursivity + 1);
+                        child2.length -= 7; // remove headers size
+                        child2.children.map(e => child2.length -= e.length);
+                        console.log('child2.length ' + child2.length);
+                        console.log('child2.typeEcOp ' + child2.typeEcOp);
+                        //this.readBuffer(buffer, 1);//TODO why ??????????
                     }
                 } else {
                     child2.nameEcTag = child2.nameEcTag / 2;
                 }
-                this.readValueOfANode(child2, buffer);
+                try {
+                    this.readValueOfANode(child2, buffer);
+                } catch (e) {
+                    console.log(recursivity + ' error ' + (i + 1) + ' length ' + child2.length);
+                    return children;
+                }
                 child.children.push(child2);
             }
 
             child.value = this.readValueOfANode(child, buffer);
-            //console.log(child.value);
+            if (recursivity == 2) {
+                console.log(recursivity + ' res.tagCountInResponse ' + res.tagCountInResponse);
+                console.log(recursivity + ' child.nameEcTag ' + child.nameEcTag);
+                console.log(recursivity + ' child.length ' + child.length);
+                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
+                console.log(recursivity + ' child.value ' + child.value);
+            }
             children.push(child);
         }
         return children;
@@ -521,6 +543,9 @@ export class AMuleCli {
      * @returns value
      */
     private readValueOfANode(child2, buffer) {
+        if (!child2.length) {
+            return '';
+        }
         if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT8) { // 2
             child2.value = this.readBuffer(buffer, child2.length);
         }

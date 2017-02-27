@@ -427,23 +427,24 @@ var AMuleCli = (function () {
         return val;
     };
     ;
-    AMuleCli.prototype.readBufferChildren = function (buffer, res) {
+    AMuleCli.prototype.readBufferChildren = function (buffer, res, recursivity) {
+        if (recursivity === void 0) { recursivity = 1; }
         var children = [];
-        var lengthCountDown;
         for (var j = 0; j < res.tagCountInResponse; j++) {
             var child = {
-                nameEcTag: parseInt(this.readBuffer(buffer, 2)),
+                nameEcTag: this.readBuffer(buffer, 2),
                 typeEcOp: this.readBuffer(buffer, 1),
                 length: this.readBuffer(buffer, 4),
                 tagCountInResponse: 0,
                 children: [],
                 value: null
             };
-            lengthCountDown = child.length;
             // console.log('(child.length + offset): ' + (child.length + offset) + ' bytes, totalSizeOfRequest' + totalSizeOfRequest);
-            if (child.length + this.offset > res.totalSizeOfRequest) {
-                console.error('ERROR: should not happen');
-                return res;
+            if (res.totalSizeOfRequest && child.length + this.offset > res.totalSizeOfRequest) {
+                console.log('ERROR: child.length + this.offset > res.totalSizeOfRequest');
+                console.log(child);
+                console.log(children);
+                return children;
             }
             // if name (ecTag) is odd there is a child count
             if (child.nameEcTag % 2) {
@@ -453,29 +454,59 @@ var AMuleCli = (function () {
             else {
                 child.nameEcTag = child.nameEcTag / 2;
             }
-            for (var i = 0; i < child.tagCountInResponse; i++) {
+            if (child.tagCountInResponse > 0) {
+                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
+            }
+            var _loop_1 = function (i) {
                 var child2 = {
-                    nameEcTag: parseInt(this.readBuffer(buffer, 2)),
-                    typeEcOp: this.readBuffer(buffer, 1),
-                    length: this.readBuffer(buffer, 4),
+                    nameEcTag: parseInt(this_1.readBuffer(buffer, 2)),
+                    typeEcOp: this_1.readBuffer(buffer, 1),
+                    length: this_1.readBuffer(buffer, 4),
                     tagCountInResponse: 0,
+                    children: [],
                     value: ''
                 };
                 child.length -= (7 + child2.length);
-                if (child2.nameEcTag % 2) {
+                if (child2.nameEcTag % 2 && child2.nameEcTag !== 1579) {
                     child2.nameEcTag = (child2.nameEcTag - 1) / 2;
-                    //child2.tagCountInResponse = this.readBuffer(buffer, 2);
+                    console.log(child2.nameEcTag);
+                    child2.tagCountInResponse = this_1.readBuffer(buffer, 2);
                     if (child2.tagCountInResponse > 0) {
+                        console.log(recursivity + ' child2.tagCountInResponse ' + child2.tagCountInResponse);
+                        //this.offset += 4 * child2.tagCountInResponse;
+                        child2.children = this_1.readBufferChildren(buffer, child2, recursivity + 1);
+                        child2.length -= 7; // remove headers size
+                        child2.children.map(function (e) { return child2.length -= e.length; });
+                        console.log('child2.length ' + child2.length);
+                        console.log('child2.typeEcOp ' + child2.typeEcOp);
                     }
                 }
                 else {
                     child2.nameEcTag = child2.nameEcTag / 2;
                 }
-                this.readValueOfANode(child2, buffer);
+                try {
+                    this_1.readValueOfANode(child2, buffer);
+                }
+                catch (e) {
+                    console.log(recursivity + ' error ' + (i + 1) + ' length ' + child2.length);
+                    return { value: children };
+                }
                 child.children.push(child2);
+            };
+            var this_1 = this;
+            for (var i = 0; i < child.tagCountInResponse; i++) {
+                var state_1 = _loop_1(i);
+                if (typeof state_1 === "object")
+                    return state_1.value;
             }
             child.value = this.readValueOfANode(child, buffer);
-            //console.log(child.value);
+            if (recursivity == 2) {
+                console.log(recursivity + ' res.tagCountInResponse ' + res.tagCountInResponse);
+                console.log(recursivity + ' child.nameEcTag ' + child.nameEcTag);
+                console.log(recursivity + ' child.length ' + child.length);
+                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
+                console.log(recursivity + ' child.value ' + child.value);
+            }
             children.push(child);
         }
         return children;
@@ -490,6 +521,9 @@ var AMuleCli = (function () {
      * @returns value
      */
     AMuleCli.prototype.readValueOfANode = function (child2, buffer) {
+        if (!child2.length) {
+            return '';
+        }
         if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT8) {
             child2.value = this.readBuffer(buffer, child2.length);
         }

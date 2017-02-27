@@ -15,6 +15,10 @@ class AMuleCliResponse {
     public size; //size of a downloaded file
     public length;
 }
+class InternalResponse {
+    public children = [];
+    public sizeToRemoveForParent = 0;
+}
 
 export class AMuleCli {
     private isConnected: Boolean = false;
@@ -62,6 +66,7 @@ export class AMuleCli {
     private ECOpCodes = {
         EC_OP_STRINGS: 0x06,
         EC_TAGTYPE_UINT16: 0x03,
+        EC_TAGTYPE_CUMSTOM: 1,
         EC_TAGTYPE_UINT8: 2, // defined in ECTagTypes.h
         EC_TAGTYPE_HASH16: 0x09,
         EC_OP_AUTH_FAIL: 0x03,
@@ -453,9 +458,8 @@ export class AMuleCli {
         return val;
     };
 
-    private readBufferChildren(buffer, res, recursivity = 1) {
-
-        const children = [];
+    private readBufferChildren(buffer, res, recursivity = 1): InternalResponse {
+        let response: InternalResponse = new InternalResponse();
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
             const child = {
@@ -470,9 +474,7 @@ export class AMuleCli {
             // console.log('(child.length + offset): ' + (child.length + offset) + ' bytes, totalSizeOfRequest' + totalSizeOfRequest);
             if (res.totalSizeOfRequest && child.length + this.offset > res.totalSizeOfRequest) {
                 console.log('ERROR: child.length + this.offset > res.totalSizeOfRequest');
-                console.log(child);
-                console.log(children);
-                return children;
+                return response;
             }
 
             // if name (ecTag) is odd there is a child count
@@ -495,19 +497,18 @@ export class AMuleCli {
                     value: ''
                 };
                 child.length -= (7 + child2.length);
-                if (child2.nameEcTag % 2 && child2.nameEcTag !== 1579) {
+                if (child2.nameEcTag % 2) {
                     child2.nameEcTag = (child2.nameEcTag - 1) / 2;
                     console.log(child2.nameEcTag);
                     child2.tagCountInResponse = this.readBuffer(buffer, 2);
                     if (child2.tagCountInResponse > 0) {
                         console.log(recursivity + ' child2.tagCountInResponse ' + child2.tagCountInResponse);
-                        //this.offset += 4 * child2.tagCountInResponse;
-                        child2.children = this.readBufferChildren(buffer, child2, recursivity + 1);
-                        child2.length -= 7; // remove headers size
+                        let res2 = this.readBufferChildren(buffer, child2, recursivity + 1);
+                        child2.children = res2.children;
+                        child2.length -= 7 * child2.tagCountInResponse; // remove headers size
                         child2.children.map(e => child2.length -= e.length);
                         console.log('child2.length ' + child2.length);
                         console.log('child2.typeEcOp ' + child2.typeEcOp);
-                        //this.readBuffer(buffer, 1);//TODO why ??????????
                     }
                 } else {
                     child2.nameEcTag = child2.nameEcTag / 2;
@@ -516,8 +517,9 @@ export class AMuleCli {
                     this.readValueOfANode(child2, buffer);
                 } catch (e) {
                     console.log(recursivity + ' error ' + (i + 1) + ' length ' + child2.length);
-                    return children;
+                    return response;
                 }
+                console.log(child2);
                 child.children.push(child2);
             }
 
@@ -525,13 +527,14 @@ export class AMuleCli {
             if (recursivity == 2) {
                 console.log(recursivity + ' res.tagCountInResponse ' + res.tagCountInResponse);
                 console.log(recursivity + ' child.nameEcTag ' + child.nameEcTag);
+                console.log(recursivity + ' child.typeEcOp ' + child.typeEcOp);
                 console.log(recursivity + ' child.length ' + child.length);
                 console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
                 console.log(recursivity + ' child.value ' + child.value);
             }
-            children.push(child);
+            response.children.push(child);
         }
-        return children;
+        return response;
     };
     private uintToString(uintArray) {
         var encodedString = String.fromCharCode.apply(null, uintArray),
@@ -547,6 +550,9 @@ export class AMuleCli {
             return '';
         }
         if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT8) { // 2
+            child2.value = this.readBuffer(buffer, child2.length);
+        }
+        else if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT16) { // 3
             child2.value = this.readBuffer(buffer, child2.length);
         }
         else if (child2.typeEcOp === 4) { // integer
@@ -625,7 +631,7 @@ export class AMuleCli {
                 response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
             }
 
-            response.children = this.readBufferChildren(buffer, response);
+            response.children = this.readBufferChildren(buffer, response).children;
             response.children.forEach(e => {
                 if (e.children) {
                     e.children.forEach(m => {

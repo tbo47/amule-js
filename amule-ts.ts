@@ -18,6 +18,7 @@ class AMuleCliResponse {
 class InternalResponse {
     public children = [];
     public sizeToRemoveForParent = 0;
+    public value;
 }
 
 export class AMuleCli {
@@ -458,8 +459,8 @@ export class AMuleCli {
         return val;
     };
 
-    private readBufferChildren(buffer, res, recursivity = 1): InternalResponse {
-        let response: InternalResponse = new InternalResponse();
+    private readBufferChildren(buffer, res, recursivity = 1) {
+        res.children = [];
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
             const child = {
@@ -468,79 +469,31 @@ export class AMuleCli {
                 length: this.readBuffer(buffer, 4), // length without ectag, ecOp, length and tag count BUT with children length
                 tagCountInResponse: 0,
                 children: [],
-                value: null
+                value: ''
             };
+            res.length -= (7 + child.length); // remove header length + length
 
-            // console.log('(child.length + offset): ' + (child.length + offset) + ' bytes, totalSizeOfRequest' + totalSizeOfRequest);
-            if (res.totalSizeOfRequest && child.length + this.offset > res.totalSizeOfRequest) {
-                console.log('ERROR: child.length + this.offset > res.totalSizeOfRequest');
-                return response;
-            }
-
-            // if name (ecTag) is odd there is a child count
-            if (child.nameEcTag % 2) {
+            if (child.nameEcTag % 2) {// if name (ecTag) is odd there is a child count
                 child.nameEcTag = (child.nameEcTag - 1) / 2;
                 child.tagCountInResponse = this.readBuffer(buffer, 2);
+                res.length -= 2;
             } else {
                 child.nameEcTag = child.nameEcTag / 2;
             }
-            if (child.tagCountInResponse > 0) {
-                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
-            }
-            for (let i = 0; i < child.tagCountInResponse; i++) {
-                const child2 = {
-                    nameEcTag: parseInt(this.readBuffer(buffer, 2)),
-                    typeEcOp: this.readBuffer(buffer, 1),
-                    length: this.readBuffer(buffer, 4),
-                    tagCountInResponse: 0,
-                    children: [],
-                    value: ''
-                };
-                child.length -= (7 + child2.length);
-                if (child2.nameEcTag % 2) {
-                    child2.nameEcTag = (child2.nameEcTag - 1) / 2;
-                    console.log(child2.nameEcTag);
-                    child2.tagCountInResponse = this.readBuffer(buffer, 2);
-                    if (child2.tagCountInResponse > 0) {
-                        console.log(recursivity + ' child2.tagCountInResponse ' + child2.tagCountInResponse);
-                        let res2 = this.readBufferChildren(buffer, child2, recursivity + 1);
-                        child2.children = res2.children;
-                        child2.length -= 7 * child2.tagCountInResponse; // remove headers size
-                        child2.children.map(e => child2.length -= e.length);
-                        console.log('child2.length ' + child2.length);
-                        console.log('child2.typeEcOp ' + child2.typeEcOp);
-                    }
-                } else {
-                    child2.nameEcTag = child2.nameEcTag / 2;
-                }
-                try {
-                    this.readValueOfANode(child2, buffer);
-                } catch (e) {
-                    console.log(recursivity + ' error ' + (i + 1) + ' length ' + child2.length);
-                    return response;
-                }
-                console.log(child2);
-                child.children.push(child2);
-            }
-
-            child.value = this.readValueOfANode(child, buffer);
-            if (recursivity == 2) {
-                console.log(recursivity + ' res.tagCountInResponse ' + res.tagCountInResponse);
-                console.log(recursivity + ' child.nameEcTag ' + child.nameEcTag);
-                console.log(recursivity + ' child.typeEcOp ' + child.typeEcOp);
-                console.log(recursivity + ' child.length ' + child.length);
-                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
-                console.log(recursivity + ' child.value ' + child.value);
-            }
-            response.children.push(child);
+            this.readBufferChildren(buffer, child, recursivity + 1);
+            res.children.push(child);
         }
-        return response;
+        if (recursivity > 1) {
+            res.value = this.readValueOfANode(res, buffer);
+        }
     };
+
     private uintToString(uintArray) {
         var encodedString = String.fromCharCode.apply(null, uintArray),
             decodedString = decodeURIComponent(encodedString);
         return decodedString;
     }
+
     /**
      * Read the value of a node according to its type (typeEcOp) and size in the buffer
      * @returns value
@@ -631,7 +584,7 @@ export class AMuleCli {
                 response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
             }
 
-            response.children = this.readBufferChildren(buffer, response).children;
+            this.readBufferChildren(buffer, response);
             response.children.forEach(e => {
                 if (e.children) {
                     e.children.forEach(m => {

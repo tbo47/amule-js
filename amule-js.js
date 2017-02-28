@@ -6,6 +6,13 @@ var AMuleCliResponse = (function () {
     }
     return AMuleCliResponse;
 }());
+var InternalResponse = (function () {
+    function InternalResponse() {
+        this.children = [];
+        this.sizeToRemoveForParent = 0;
+    }
+    return InternalResponse;
+}());
 var AMuleCli = (function () {
     function AMuleCli(ip, port, password, md5Function) {
         this.isConnected = false;
@@ -25,6 +32,7 @@ var AMuleCli = (function () {
         this.ECOpCodes = {
             EC_OP_STRINGS: 0x06,
             EC_TAGTYPE_UINT16: 0x03,
+            EC_TAGTYPE_CUMSTOM: 1,
             EC_TAGTYPE_UINT8: 2,
             EC_TAGTYPE_HASH16: 0x09,
             EC_OP_AUTH_FAIL: 0x03,
@@ -429,7 +437,7 @@ var AMuleCli = (function () {
     ;
     AMuleCli.prototype.readBufferChildren = function (buffer, res, recursivity) {
         if (recursivity === void 0) { recursivity = 1; }
-        var children = [];
+        res.children = [];
         for (var j = 0; j < res.tagCountInResponse; j++) {
             var child = {
                 nameEcTag: this.readBuffer(buffer, 2),
@@ -437,79 +445,23 @@ var AMuleCli = (function () {
                 length: this.readBuffer(buffer, 4),
                 tagCountInResponse: 0,
                 children: [],
-                value: null
+                value: ''
             };
-            // console.log('(child.length + offset): ' + (child.length + offset) + ' bytes, totalSizeOfRequest' + totalSizeOfRequest);
-            if (res.totalSizeOfRequest && child.length + this.offset > res.totalSizeOfRequest) {
-                console.log('ERROR: child.length + this.offset > res.totalSizeOfRequest');
-                console.log(child);
-                console.log(children);
-                return children;
-            }
-            // if name (ecTag) is odd there is a child count
+            res.length -= (7 + child.length); // remove header length + length
             if (child.nameEcTag % 2) {
                 child.nameEcTag = (child.nameEcTag - 1) / 2;
                 child.tagCountInResponse = this.readBuffer(buffer, 2);
+                res.length -= 2;
             }
             else {
                 child.nameEcTag = child.nameEcTag / 2;
             }
-            if (child.tagCountInResponse > 0) {
-                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
-            }
-            var _loop_1 = function (i) {
-                var child2 = {
-                    nameEcTag: parseInt(this_1.readBuffer(buffer, 2)),
-                    typeEcOp: this_1.readBuffer(buffer, 1),
-                    length: this_1.readBuffer(buffer, 4),
-                    tagCountInResponse: 0,
-                    children: [],
-                    value: ''
-                };
-                child.length -= (7 + child2.length);
-                if (child2.nameEcTag % 2 && child2.nameEcTag !== 1579) {
-                    child2.nameEcTag = (child2.nameEcTag - 1) / 2;
-                    console.log(child2.nameEcTag);
-                    child2.tagCountInResponse = this_1.readBuffer(buffer, 2);
-                    if (child2.tagCountInResponse > 0) {
-                        console.log(recursivity + ' child2.tagCountInResponse ' + child2.tagCountInResponse);
-                        //this.offset += 4 * child2.tagCountInResponse;
-                        child2.children = this_1.readBufferChildren(buffer, child2, recursivity + 1);
-                        child2.length -= 7; // remove headers size
-                        child2.children.map(function (e) { return child2.length -= e.length; });
-                        console.log('child2.length ' + child2.length);
-                        console.log('child2.typeEcOp ' + child2.typeEcOp);
-                    }
-                }
-                else {
-                    child2.nameEcTag = child2.nameEcTag / 2;
-                }
-                try {
-                    this_1.readValueOfANode(child2, buffer);
-                }
-                catch (e) {
-                    console.log(recursivity + ' error ' + (i + 1) + ' length ' + child2.length);
-                    return { value: children };
-                }
-                child.children.push(child2);
-            };
-            var this_1 = this;
-            for (var i = 0; i < child.tagCountInResponse; i++) {
-                var state_1 = _loop_1(i);
-                if (typeof state_1 === "object")
-                    return state_1.value;
-            }
-            child.value = this.readValueOfANode(child, buffer);
-            if (recursivity == 2) {
-                console.log(recursivity + ' res.tagCountInResponse ' + res.tagCountInResponse);
-                console.log(recursivity + ' child.nameEcTag ' + child.nameEcTag);
-                console.log(recursivity + ' child.length ' + child.length);
-                console.log(recursivity + ' child.tagCountInResponse ' + child.tagCountInResponse);
-                console.log(recursivity + ' child.value ' + child.value);
-            }
-            children.push(child);
+            this.readBufferChildren(buffer, child, recursivity + 1);
+            res.children.push(child);
         }
-        return children;
+        if (recursivity > 1) {
+            res.value = this.readValueOfANode(res, buffer);
+        }
     };
     ;
     AMuleCli.prototype.uintToString = function (uintArray) {
@@ -525,6 +477,9 @@ var AMuleCli = (function () {
             return '';
         }
         if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT8) {
+            child2.value = this.readBuffer(buffer, child2.length);
+        }
+        else if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_UINT16) {
             child2.value = this.readBuffer(buffer, child2.length);
         }
         else if (child2.typeEcOp === 4) {
@@ -607,7 +562,7 @@ var AMuleCli = (function () {
             else if (response.opCode === 40) {
                 response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
             }
-            response.children = _this.readBufferChildren(buffer, response);
+            _this.readBufferChildren(buffer, response);
             response.children.forEach(function (e) {
                 if (e.children) {
                     e.children.forEach(function (m) {

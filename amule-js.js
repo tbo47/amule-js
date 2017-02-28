@@ -3,15 +3,11 @@ var AMuleCliResponse = (function () {
         this.totalSizeOfRequest = 0;
         this.opCode = null;
         this.children = [];
+        this.sourceCount = 0;
+        this.sourceCountXfer = 0;
+        this.status = 0;
     }
     return AMuleCliResponse;
-}());
-var InternalResponse = (function () {
-    function InternalResponse() {
-        this.children = [];
-        this.sizeToRemoveForParent = 0;
-    }
-    return InternalResponse;
 }());
 var AMuleCli = (function () {
     function AMuleCli(ip, port, password, md5Function) {
@@ -549,37 +545,49 @@ var AMuleCli = (function () {
         var _this = this;
         return new Promise(function (resolve, reject) {
             var response = _this._readHeader(buffer);
-            response.opCodeLabel = null;
-            if (response.opCode === 1) {
-                response.opCodeLabel = 'EC_OP_NOOP';
-            }
-            else if (response.opCode === 5) {
-                response.opCodeLabel = 'EC_OP_FAILED';
-            }
-            else if (response.opCode === 31) {
-                response.opCodeLabel = 'EC_OP_DLOAD_QUEUE';
-            }
-            else if (response.opCode === 40) {
-                response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
+            switch (response.opCode) {
+                case 1:
+                    response.opCodeLabel = 'EC_OP_NOOP';
+                    break;
+                case 5:
+                    response.opCodeLabel = 'EC_OP_FAILED';
+                    break;
+                case 31:
+                    response.opCodeLabel = 'EC_OP_DLOAD_QUEUE';
+                    break;
+                case 40:
+                    response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
+                    break;
+                default: ;
             }
             _this.readBufferChildren(buffer, response);
-            response.children.forEach(function (e) {
-                if (e.children) {
-                    e.children.forEach(function (m) {
-                        if (m.nameEcTag === 769) {
+            response.children.map(function (e) {
+                e.children.map(function (m) {
+                    switch (m.nameEcTag) {
+                        case 769:
                             e.value = m.value;
-                        }
-                        if (m.nameEcTag === 798) {
+                            break; // EC_TAG_PARTFILE_NAME
+                        case 798:
                             e.hash = m.value;
-                        }
-                        if (m.nameEcTag === 771) {
-                            e.size = parseInt(m.value);
-                        }
-                        if (m.nameEcTag === 782) {
+                            break; // EC_TAG_PARTFILE_HASH
+                        case 771:
+                            e.size = m.value;
+                            break; // EC_TAG_PARTFILE_SIZE_FULL
+                        case 782:
                             e.edkLink = m.value;
-                        }
-                    });
-                }
+                            break; // EC_TAG_PARTFILE_ED2K_LINK
+                        case 778:
+                            e.sourceCount = m.value;
+                            break; //EC_TAG_PARTFILE_SOURCE_COUNT
+                        case 781:
+                            e.sourceCountXfer = m.value;
+                            break; //EC_TAG_PARTFILE_SOURCE_COUNT_XFER
+                        case 776:
+                            e.status = m.value;
+                            break; //EC_TAG_PARTFILE_STATUS
+                        default: ;
+                    }
+                });
             });
             resolve(response);
         });

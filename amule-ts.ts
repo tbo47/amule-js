@@ -14,11 +14,9 @@ class AMuleCliResponse {
     public hash;
     public size; //size of a downloaded file
     public length;
-}
-class InternalResponse {
-    public children = [];
-    public sizeToRemoveForParent = 0;
-    public value;
+    public sourceCount: number = 0;
+    public sourceCountXfer: number = 0;
+    public status: number = 0;
 }
 
 export class AMuleCli {
@@ -573,35 +571,28 @@ export class AMuleCli {
     private readResultsList(buffer): Promise<AMuleCliResponse> {
         return new Promise<AMuleCliResponse>((resolve, reject) => {
             let response = this._readHeader(buffer);
-            response.opCodeLabel = null;
-            if (response.opCode === 1) {
-                response.opCodeLabel = 'EC_OP_NOOP';
-            } else if (response.opCode === 5) {
-                response.opCodeLabel = 'EC_OP_FAILED';
-            } else if (response.opCode === 31) {
-                response.opCodeLabel = 'EC_OP_DLOAD_QUEUE';
-            } else if (response.opCode === 40) {
-                response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
+            switch (response.opCode) {
+                case 1: response.opCodeLabel = 'EC_OP_NOOP'; break;
+                case 5: response.opCodeLabel = 'EC_OP_FAILED'; break;
+                case 31: response.opCodeLabel = 'EC_OP_DLOAD_QUEUE'; break;
+                case 40: response.opCodeLabel = 'EC_OP_SEARCH_RESULTS'; break;
+                default: ;
             }
-
             this.readBufferChildren(buffer, response);
-            response.children.forEach(e => {
-                if (e.children) {
-                    e.children.forEach(m => {
-                        if (m.nameEcTag === 769) { // EC_TAG_PARTFILE_NAME
-                            e.value = m.value;
-                        }
-                        if (m.nameEcTag === 798) { // EC_TAG_PARTFILE_HASH
-                            e.hash = m.value;
-                        }
-                        if (m.nameEcTag === 771) { // EC_TAG_PARTFILE_SIZE_FULL
-                            e.size = parseInt(m.value);
-                        }
-                        if (m.nameEcTag === 782) { // EC_TAG_PARTFILE_ED2K_LINK
-                            e.edkLink = m.value;
-                        }
-                    });
-                }
+            response.children.map(e => {
+                e.children.map(m => {
+                    switch (m.nameEcTag) {
+                        case 769: e.value = m.value; break;// EC_TAG_PARTFILE_NAME
+                        case 798: e.hash = m.value; break;// EC_TAG_PARTFILE_HASH
+                        case 771: e.size = m.value; break;// EC_TAG_PARTFILE_SIZE_FULL
+                        case 782: e.edkLink = m.value; break;// EC_TAG_PARTFILE_ED2K_LINK
+                        case 778: e.sourceCount = m.value; break;//EC_TAG_PARTFILE_SOURCE_COUNT
+                        case 781: e.sourceCountXfer = m.value; break;//EC_TAG_PARTFILE_SOURCE_COUNT_XFER
+                        case 776: e.status = m.value; break;//EC_TAG_PARTFILE_STATUS
+                        default: ;
+                    }
+                });
+
             });
             resolve(response);
         });

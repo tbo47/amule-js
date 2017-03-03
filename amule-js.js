@@ -65,6 +65,12 @@ var AMuleCli = (function () {
             EC_TAG_SEARCH_STATUS: 0x0708,
             EC_TAG_SEARCH_PARENT: 0x0709
         };
+        this.EC_TAG_MAPPING = [{ EC_TAG_PARTFILE_NAME: 769 }, { EC_TAG_PARTFILE_SIZE_DONE: 774 }, { EC_TAG_PARTFILE_SPEED: 775 }, { EC_TAG_PARTFILE_LAST_SEEN_COMP: 785 },
+            { EC_TAG_PARTFILE_LAST_RECV: 784 }, { EC_TAG_PARTFILE_COMMENTS: 790 }, { EC_TAG_PARTFILE_HASH: 798 }, { EC_TAG_PARTFILE_SIZE_FULL: 771 }, { EC_TAG_PARTFILE_ED2K_LINK: 782 },
+            { EC_TAG_PARTFILE_SOURCE_COUNT: 778 }, { EC_TAG_PARTFILE_SOURCE_COUNT_XFER: 781 }, { EC_TAG_PARTFILE_STATUS: 776 },
+            { EC_TAG_KNOWNFILE_FILENAME: 1032 }, { EC_TAG_KNOWNFILE_XFERRED_ALL: 1026 }, { EC_TAG_KNOWNFILE_REQ_COUNT_ALL: 1028 },
+            { EC_TAG_PARTFILE_LAST_SEEN_COMP: 785 }, { EC_TAG_PARTFILE_LAST_RECV: 784 }
+        ];
         this.client = null; // node socket
         this.isRunningPromise = false;
         this.ip = ip;
@@ -479,16 +485,22 @@ var AMuleCli = (function () {
             child2.value = this.readBuffer(buffer, child2.length);
         }
         else if (child2.typeEcOp === 4) {
-            for (var m_1 = 0; m_1 < child2.length; m_1++) {
-                child2.value += "" + this.readBuffer(buffer, 1);
-            }
+            child2.value = this.readBuffer(buffer, child2.length);
+        }
+        else if (child2.typeEcOp === 5) {
+            var high = this.readBuffer(buffer, 4);
+            var low = this.readBuffer(buffer, 4);
+            var n = high * 4294967296.0 + low;
+            if (low < 0)
+                n += 4294967296;
+            child2.value = n;
         }
         else if (child2.typeEcOp === this.ECOpCodes.EC_OP_STRINGS) {
             if (!this.textDecoder && typeof this.stringDecoder === 'undefined') {
                 console.log("you won't be able to read special utf-8 char");
             }
             var uint8array = [];
-            for (var m_2 = 0; m_2 < child2.length; m_2++) {
+            for (var m_1 = 0; m_1 < child2.length; m_1++) {
                 var intValue = this.readBuffer(buffer, 1);
                 if (intValue > 0x80) {
                     uint8array.push(intValue);
@@ -563,31 +575,21 @@ var AMuleCli = (function () {
             _this.readBufferChildren(buffer, response);
             response.children.map(function (e) {
                 e.children.map(function (m) {
-                    switch (m.nameEcTag) {
-                        case 769:
-                            e.value = m.value;
-                            break; // EC_TAG_PARTFILE_NAME
-                        case 798:
-                            e.hash = m.value;
-                            break; // EC_TAG_PARTFILE_HASH
-                        case 771:
-                            e.size = m.value;
-                            break; // EC_TAG_PARTFILE_SIZE_FULL
-                        case 782:
-                            e.edkLink = m.value;
-                            break; // EC_TAG_PARTFILE_ED2K_LINK
-                        case 778:
-                            e.sourceCount = m.value;
-                            break; //EC_TAG_PARTFILE_SOURCE_COUNT
-                        case 781:
-                            e.sourceCountXfer = m.value;
-                            break; //EC_TAG_PARTFILE_SOURCE_COUNT_XFER
-                        case 776:
-                            e.status = m.value;
-                            break; //EC_TAG_PARTFILE_STATUS
-                        default: ;
-                    }
+                    _this.EC_TAG_MAPPING.map(function (REF) {
+                        Object.keys(REF).map(function (key) {
+                            if (m.value && m.nameEcTag === REF[key]) {
+                                e[key.split('EC_TAG_')[1].toLowerCase()] = m.value;
+                            }
+                        });
+                    });
+                    e.value = e['partfile_name'];
                 });
+                if (e['knownfile_xferred_all']) {
+                    e['sharedRatio'] = e['knownfile_xferred_all'] / e['partfile_size_full'];
+                }
+                if (e['partfile_size_done']) {
+                    e['completeness'] = Math.floor(e['partfile_size_done'] * 10000 / e['partfile_size_full']) / 100;
+                }
             });
             resolve(response);
         });

@@ -69,7 +69,12 @@ var AMuleCli = (function () {
             { EC_TAG_PARTFILE_LAST_RECV: 784 }, { EC_TAG_PARTFILE_COMMENTS: 790 }, { EC_TAG_PARTFILE_HASH: 798 }, { EC_TAG_PARTFILE_SIZE_FULL: 771 }, { EC_TAG_PARTFILE_ED2K_LINK: 782 },
             { EC_TAG_PARTFILE_SOURCE_COUNT: 778 }, { EC_TAG_PARTFILE_SOURCE_COUNT_XFER: 781 }, { EC_TAG_PARTFILE_STATUS: 776 },
             { EC_TAG_KNOWNFILE_FILENAME: 1032 }, { EC_TAG_KNOWNFILE_XFERRED_ALL: 1026 }, { EC_TAG_KNOWNFILE_REQ_COUNT_ALL: 1028 },
-            { EC_TAG_PARTFILE_LAST_SEEN_COMP: 785 }, { EC_TAG_PARTFILE_LAST_RECV: 784 }
+            { EC_TAG_PARTFILE_LAST_SEEN_COMP: 785 }, { EC_TAG_PARTFILE_LAST_RECV: 784 }, { EC_TAG_PREFS_GENERAL: 4608 }, { EC_TAG_USER_NICK: 4609 }, { EC_TAG_USER_HASH: 4610 },
+            { EC_TAG_PREFS_CONNECTIONS: 4864 }, { EC_TAG_CONN_MAX_UL: 4868 }, { EC_TAG_CONN_MAX_DL: 4867 }, { EC_TAG_CLIENT: 1536 }, { EC_TAG_CLIENT_NAME: 256 },
+            { EC_TAG_CLIENT_HASH: 1539 }, { EC_TAG_CLIENT_USER_ID: 1566 }, { EC_TAG_CLIENT_SOFTWARE: 1537 }, { EC_TAG_CLIENT_SOFT_VER_STR: 1557 },
+            { EC_TAG_CLIENT_USER_IP: 1552 }, { EC_TAG_CLIENT_USER_PORT: 1553 }, { EC_TAG_CLIENT_DISABLE_VIEW_SHARED: 1563 }, { EC_TAG_CLIENT_OS_INFO: 1577 },
+            { EC_TAG_SERVER: 1280 }, { EC_TAG_STATS_LOGGER_MESSAGE: 525 }, { EC_TAG_STATS_TOTAL_SENT_BYTES: 536 }, { EC_TAG_STATS_TOTAL_RECEIVED_BYTES: 537 },
+            { EC_TAG_STATS_UL_SPEED: 512 }, { EC_TAG_STATS_DL_SPEED: 513 }, { EC_TAG_STATS_UL_SPEED_LIMIT: 514 }, { EC_TAG_STATS_DL_SPEED_LIMIT: 515 }
         ];
         this.client = null; // node socket
         this.isRunningPromise = false;
@@ -383,6 +388,27 @@ var AMuleCli = (function () {
     };
     ;
     /**
+     *  < EC_OP_GET_PREFERENCES opCode:63 size:20 (compressed: 13)
+     *      EC_TAG_DETAIL_LEVEL tagName:4 dataType:2 dataLen:1 = EC_DETAIL_UPDATE
+     *      EC_TAG_SELECT_PREFS tagName:4096 dataType:3 dataLen:2 = 15103
+     *  > EC_OP_SET_PREFERENCES opCode:64 size:683 (compressed: 540)
+     *      EC_TAG_DETAIL_LEVEL tagName:4 dataType:2 dataLen:1 = EC_DETAIL_UPDATE
+     *      EC_TAG_PREFS_GENERAL tagName:4608 dataType:1 dataLen:0 = empty
+     *        EC_TAG_USER_NICK tagName:4609 dataType:6 dataLen:13 = name
+     */
+    AMuleCli.prototype.getPreferencesRequest = function () {
+        this._setHeadersToRequest(63);
+        var tagCount = 0;
+        var EC_TAG_DETAIL_LEVEL = 4;
+        var EC_DETAIL_UPDATE = 3;
+        this._buildTagArrayBuffer(EC_TAG_DETAIL_LEVEL * 2, this.ECOpCodes.EC_TAGTYPE_UINT8, EC_DETAIL_UPDATE, null);
+        tagCount++;
+        this._buildTagArrayBuffer(4096 * 2, this.ECOpCodes.EC_TAGTYPE_UINT16, 15103, null);
+        tagCount++;
+        return this._finalizeRequest(tagCount);
+    };
+    ;
+    /**
      * < EC_OP_PARTFILE_DELETE opCode:29 size:26 (compressed: 22)
      *     EC_TAG_PARTFILE tagName:768 dataType:9 dataLen:16 = EA63C3774DF2EB871EFA3AC58543B66F
      */
@@ -553,6 +579,43 @@ var AMuleCli = (function () {
         response.tagCountInResponse = this.readBuffer(buffer, 2);
         return response;
     };
+    AMuleCli.prototype._formatResultsList = function (response) {
+        var _this = this;
+        response.children.map(function (e) {
+            _this.EC_TAG_MAPPING.map(function (REF) {
+                Object.keys(REF).map(function (key) {
+                    if (!e.children.length && e.nameEcTag === REF[key]) {
+                        response[key.split('EC_TAG_')[1].toLowerCase()] = e.value;
+                    }
+                });
+            });
+            if (!e.length) {
+                delete e.value;
+            }
+            delete e.length;
+            delete e.tagCountInResponse;
+            if (e.children && !e.children.length) {
+                delete e.children;
+            }
+            else {
+                _this._formatResultsList(e);
+            }
+        });
+        this.EC_TAG_MAPPING.map(function (REF) {
+            Object.keys(REF).map(function (key) {
+                if (response.nameEcTag === REF[key]) {
+                    response['label'] = key.split('EC_TAG_')[1].toLowerCase();
+                }
+            });
+        });
+        if (response['knownfile_xferred_all']) {
+            response['sharedRatio'] = response['knownfile_xferred_all'] / response['partfile_size_full'];
+        }
+        if (response['partfile_size_done']) {
+            response['completeness'] = Math.floor(response['partfile_size_done'] * 10000 / response['partfile_size_full']) / 100;
+        }
+        return response;
+    };
     AMuleCli.prototype.readResultsList = function (buffer) {
         var _this = this;
         return new Promise(function (resolve, reject) {
@@ -573,24 +636,7 @@ var AMuleCli = (function () {
                 default: ;
             }
             _this.readBufferChildren(buffer, response);
-            response.children.map(function (e) {
-                e.children.map(function (m) {
-                    _this.EC_TAG_MAPPING.map(function (REF) {
-                        Object.keys(REF).map(function (key) {
-                            if (m.value && m.nameEcTag === REF[key]) {
-                                e[key.split('EC_TAG_')[1].toLowerCase()] = m.value;
-                            }
-                        });
-                    });
-                    e.value = e['partfile_name'];
-                });
-                if (e['knownfile_xferred_all']) {
-                    e['sharedRatio'] = e['knownfile_xferred_all'] / e['partfile_size_full'];
-                }
-                if (e['partfile_size_done']) {
-                    e['completeness'] = Math.floor(e['partfile_size_done'] * 10000 / e['partfile_size_full']) / 100;
-                }
-            });
+            _this._formatResultsList(response);
             resolve(response);
         });
     };
@@ -722,7 +768,7 @@ var AMuleCli = (function () {
             list.children = list.children.filter(function (e) {
                 var isPresent = true;
                 q.split(' ').map(function (r) {
-                    if (e.value.toLowerCase().indexOf(r) === -1) {
+                    if (e['partfile_name'] && e['partfile_name'].toLowerCase().indexOf(r) === -1) {
                         isPresent = false;
                     }
                 });
@@ -777,26 +823,46 @@ var AMuleCli = (function () {
     AMuleCli.prototype.fetchSearch = function () {
         return this.sendToServerWhenAvalaible(this.getSearchResultRequest());
     };
+    /**
+     * get all the files being currently downloaded
+     */
     AMuleCli.prototype.getDownloads = function () {
         return this.sendToServerWhenAvalaible(this.getDownloadsRequest());
     };
+    /**
+     * download a file in the search list
+     *
+     * @param e file to download (must have a hash)
+     */
     AMuleCli.prototype.download = function (e) {
         return this.sendToServerWhenAvalaible(this.downloadRequest(e));
     };
+    /**
+     * return the list of shared files
+     */
     AMuleCli.prototype.getSharedFiles = function () {
         return this.sendToServerWhenAvalaible(this.getSharedFilesRequest());
     };
+    /**
+     *
+     */
     AMuleCli.prototype.getDetailUpdate = function () {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(82));
     };
     AMuleCli.prototype.clearCompleted = function () {
         return this.sendToServerWhenAvalaible(this.clearCompletedRequest());
     };
-    AMuleCli.prototype.getStats = function () {
+    AMuleCli.prototype.getStatistiques = function () {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(10));
     };
     AMuleCli.prototype.cancelDownload = function (e) {
         return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e));
+    };
+    /**
+     * get user preferences (EC_OP_GET_PREFERENCES)
+     */
+    AMuleCli.prototype.getPreferences = function () {
+        return this.sendToServerWhenAvalaible(this.getPreferencesRequest());
     };
     return AMuleCli;
 }());

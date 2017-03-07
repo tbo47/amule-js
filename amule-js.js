@@ -414,7 +414,7 @@ var AMuleCli = (function () {
      */
     AMuleCli.prototype.getCancelDownloadRequest = function (e) {
         this._setHeadersToRequest(29); // EC_OP_PARTFILE_DELETE
-        this._buildTagArrayBuffer(768 * 2, this.ECOpCodes.EC_TAGTYPE_HASH16, e.hash, null);
+        this._buildTagArrayBuffer(768 * 2, this.ECOpCodes.EC_TAGTYPE_HASH16, e.partfile_hash, null);
         return this._finalizeRequest(1);
     };
     ;
@@ -827,7 +827,22 @@ var AMuleCli = (function () {
      * get all the files being currently downloaded
      */
     AMuleCli.prototype.getDownloads = function () {
-        return this.sendToServerWhenAvalaible(this.getDownloadsRequest());
+        return this.sendToServerWhenAvalaible(this.getDownloadsRequest()).then(function (elements) {
+            elements.children.map(function (f) {
+                ['partfile_last_recv', 'partfile_last_seen_comp'].map(function (key) {
+                    if (f[key]) {
+                        f[key + '_f'] = new Date(f[key] * 1000);
+                    }
+                });
+                ['partfile_speed'].map(function (key) {
+                    if (!f[key]) {
+                        f[key] = 0;
+                    }
+                });
+                delete f.children;
+            });
+            return elements;
+        });
     };
     /**
      * download a file in the search list
@@ -841,7 +856,17 @@ var AMuleCli = (function () {
      * return the list of shared files
      */
     AMuleCli.prototype.getSharedFiles = function () {
-        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest());
+        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest()).then(function (elements) {
+            elements.children.map(function (f) {
+                ['knownfile_req_count_all', 'sharedRatio'].map(function (key) {
+                    if (!f[key]) {
+                        f[key] = 0;
+                    }
+                });
+                delete f.children;
+            });
+            return elements;
+        });
     };
     /**
      *

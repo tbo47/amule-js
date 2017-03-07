@@ -10,8 +10,6 @@ class AMuleCliResponse {
     public children: AMuleCliResponse[] = [];
     public nameEcTag;
     public value;
-    public edkLink;
-    public hash;
     public size; //size of a downloaded file
     public length;
     public sourceCount: number = 0;
@@ -431,7 +429,7 @@ export class AMuleCli {
      */
     private getCancelDownloadRequest(e): ArrayBuffer {
         this._setHeadersToRequest(29); // EC_OP_PARTFILE_DELETE
-        this._buildTagArrayBuffer(768 * 2, this.ECOpCodes.EC_TAGTYPE_HASH16, e.hash, null);
+        this._buildTagArrayBuffer(768 * 2, this.ECOpCodes.EC_TAGTYPE_HASH16, e.partfile_hash, null);
         return this._finalizeRequest(1);
     };
 
@@ -843,7 +841,23 @@ export class AMuleCli {
      * get all the files being currently downloaded
      */
     public getDownloads(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getDownloadsRequest());
+        return this.sendToServerWhenAvalaible(this.getDownloadsRequest()).then(elements => {
+            elements.children.map(f => {
+                ['partfile_last_recv', 'partfile_last_seen_comp'].map(key => {
+                    if (f[key]) {
+                        f[key + '_f'] = new Date(f[key] * 1000);
+                    }
+                });
+                ['partfile_speed'].map(key => {
+                    if (!f[key]) {
+                        f[key] = 0;
+                    }
+                });
+                delete f.children;
+            });
+
+            return elements;
+        });
     }
 
     /**
@@ -859,7 +873,17 @@ export class AMuleCli {
      * return the list of shared files
      */
     public getSharedFiles(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest());
+        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest()).then(elements => {
+            elements.children.map(f => {
+                ['knownfile_req_count_all', 'sharedRatio'].map(key => {
+                    if (!f[key]) {
+                        f[key] = 0;
+                    }
+                });
+                delete f.children;
+            });
+            return elements;
+        });
     }
 
     /**

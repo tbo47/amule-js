@@ -374,8 +374,8 @@ export class AMuleCli {
     /**
      *
      */
-    private clearCompletedRequest() {
-        this._setHeadersToRequest(0x53); // EC_OP_CLEAR_COMPLETED
+    private simpleRequest(opCode:number) {
+        this._setHeadersToRequest(opCode);
         return this._finalizeRequest(0);
     };
 
@@ -554,6 +554,9 @@ export class AMuleCli {
                 } else {
                     child2.value += '' + String.fromCharCode(intValue);
                 }
+            }
+            if (child2.value) {
+                child2.value = child2.value.substring(0, child2.value.length - 1);
             }
         }
         else if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_HASH16) { //9
@@ -891,8 +894,12 @@ export class AMuleCli {
     public getDetailUpdate(): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(82));
     }
+
+    /**
+     * EC_OP_CLEAR_COMPLETED
+     */
     public clearCompleted(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.clearCompletedRequest());
+        return this.sendToServerWhenAvalaible(this.simpleRequest(0x53));
     }
     public getStatistiques(): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(10));
@@ -906,6 +913,13 @@ export class AMuleCli {
      */
     public getPreferences(): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getPreferencesRequest());
+    }
+    
+    /**
+     * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
+     */
+    public reloadSharedFiles(): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.simpleRequest(35));
     }
 
 }

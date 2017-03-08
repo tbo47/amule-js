@@ -358,8 +358,8 @@ var AMuleCli = (function () {
     /**
      *
      */
-    AMuleCli.prototype.clearCompletedRequest = function () {
-        this._setHeadersToRequest(0x53); // EC_OP_CLEAR_COMPLETED
+    AMuleCli.prototype.simpleRequest = function (opCode) {
+        this._setHeadersToRequest(opCode);
         return this._finalizeRequest(0);
     };
     ;
@@ -543,6 +543,9 @@ var AMuleCli = (function () {
                 else {
                     child2.value += '' + String.fromCharCode(intValue);
                 }
+            }
+            if (child2.value) {
+                child2.value = child2.value.substring(0, child2.value.length - 1);
             }
         }
         else if (child2.typeEcOp === this.ECOpCodes.EC_TAGTYPE_HASH16) {
@@ -873,8 +876,11 @@ var AMuleCli = (function () {
     AMuleCli.prototype.getDetailUpdate = function () {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(82));
     };
+    /**
+     * EC_OP_CLEAR_COMPLETED
+     */
     AMuleCli.prototype.clearCompleted = function () {
-        return this.sendToServerWhenAvalaible(this.clearCompletedRequest());
+        return this.sendToServerWhenAvalaible(this.simpleRequest(0x53));
     };
     AMuleCli.prototype.getStatistiques = function () {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(10));
@@ -887,6 +893,12 @@ var AMuleCli = (function () {
      */
     AMuleCli.prototype.getPreferences = function () {
         return this.sendToServerWhenAvalaible(this.getPreferencesRequest());
+    };
+    /**
+     * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
+     */
+    AMuleCli.prototype.reloadSharedFiles = function () {
+        return this.sendToServerWhenAvalaible(this.simpleRequest(35));
     };
     return AMuleCli;
 }());

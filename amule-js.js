@@ -164,7 +164,6 @@ var AMuleCli = (function () {
                 var dv_1 = new DataView(new ArrayBuffer(Uint8Array.BYTES_PER_ELEMENT));
                 var hashValue = parseInt(value[i_1] + value[i_1 + 1], 16);
                 dv_1.setUint8(0, hashValue);
-                // console.log("hash " + i / 2 + " : " + hashValue);
                 this.arrayBuffers.push(dv_1.buffer);
                 tagLength += Uint8Array.BYTES_PER_ELEMENT;
             }
@@ -351,7 +350,7 @@ var AMuleCli = (function () {
                 value: 0
             }];
         // if has children => +1
-        this._buildTagArrayBuffer(768 * 2 + 1, this.ECOpCodes.EC_TAGTYPE_HASH16, e.hash, children);
+        this._buildTagArrayBuffer(768 * 2 + 1, this.ECOpCodes.EC_TAGTYPE_HASH16, e.partfile_hash, children);
         tagCount++;
         return this._finalizeRequest(tagCount);
     };

@@ -374,7 +374,7 @@ export class AMuleCli {
     /**
      *
      */
-    private simpleRequest(opCode:number) {
+    private simpleRequest(opCode: number) {
         this._setHeadersToRequest(opCode);
         return this._finalizeRequest(0);
     };
@@ -603,7 +603,8 @@ export class AMuleCli {
     { EC_TAG_CLIENT_HASH: 1539 }, { EC_TAG_CLIENT_USER_ID: 1566 }, { EC_TAG_CLIENT_SOFTWARE: 1537 }, { EC_TAG_CLIENT_SOFT_VER_STR: 1557 },
     { EC_TAG_CLIENT_USER_IP: 1552 }, { EC_TAG_CLIENT_USER_PORT: 1553 }, { EC_TAG_CLIENT_DISABLE_VIEW_SHARED: 1563 }, { EC_TAG_CLIENT_OS_INFO: 1577 },
     { EC_TAG_SERVER: 1280 }, { EC_TAG_STATS_LOGGER_MESSAGE: 525 }, { EC_TAG_STATS_TOTAL_SENT_BYTES: 536 }, { EC_TAG_STATS_TOTAL_RECEIVED_BYTES: 537 },
-    { EC_TAG_STATS_UL_SPEED: 512 }, { EC_TAG_STATS_DL_SPEED: 513 }, { EC_TAG_STATS_UL_SPEED_LIMIT: 514 }, { EC_TAG_STATS_DL_SPEED_LIMIT: 515 }
+    { EC_TAG_STATS_UL_SPEED: 512 }, { EC_TAG_STATS_DL_SPEED: 513 }, { EC_TAG_STATS_UL_SPEED_LIMIT: 514 }, { EC_TAG_STATS_DL_SPEED_LIMIT: 515 },
+    { EC_TAG_PREFS_DIRECTORIES: 6656 }, { EC_TAG_DIRECTORIES_INCOMING: 6657 }, { EC_TAG_DIRECTORIES_TEMP: 6658 }
     ];
 
     private _formatResultsList(response): AMuleCliResponse {
@@ -914,7 +915,7 @@ export class AMuleCli {
     public getPreferences(): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getPreferencesRequest());
     }
-    
+
     /**
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
      */

@@ -372,6 +372,30 @@ export class AMuleCli {
     };
 
     /**
+     * < EC_OP_SET_PREFERENCES opCode:64 size:20 (compressed: 14)
+     *     EC_TAG_PREFS_CONNECTIONS tagName:4864 dataType:1 dataLen:0 = empty
+     *       EC_TAG_CONN_MAX_DL tagName:4867 dataType:2 dataLen:1 = 0
+     * or
+     *  < EC_OP_SET_PREFERENCES opCode:64 size:20 (compressed: 14)
+     *     EC_TAG_PREFS_CONNECTIONS tagName:4864 dataType:1 dataLen:0 = empty
+     *       EC_TAG_CONN_MAX_UL tagName:4868 dataType:2 dataLen:1 = 0
+     */
+    private getSetMaxBandwithRequest(tag: number, limit: number) {
+        this._setHeadersToRequest(64);
+        let tagCount = 0;
+        const children = [{
+            ecTag: tag * 2,
+            ecOp: this.ECOpCodes.EC_TAGTYPE_UINT8, //2
+            value: limit
+        }];
+
+        // if has children => +1
+        this._buildTagArrayBuffer(4864 * 2 + 1, 1, null, children);
+        tagCount++;
+        return this._finalizeRequest(tagCount);
+    };
+
+    /**
      *
      */
     private simpleRequest(opCode: number) {
@@ -765,18 +789,27 @@ export class AMuleCli {
     /**
      * Make the promises flow synchronized
      */
-    private sendToServerWhenAvalaible(r: ArrayBuffer): Promise<AMuleCliResponse> {
+    private sendToServerWhenAvalaible(r: ArrayBuffer, isSkipable: boolean, label: string): Promise<AMuleCliResponse> {
+        // console.log(label);
+        // console.time(label);
         if (!this.isRunningPromise) {
             this.isRunningPromise = true;
             return this.sendToServer(r).then(data => {
                 this.isRunningPromise = false;
+                // console.timeEnd(label);
                 return this.readResultsList(data)
             });
         } else {
+            //console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
             return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    resolve(this.sendToServerWhenAvalaible(r));
-                }, 400);
+                if (!isSkipable) {
+                    setTimeout(() => {
+                        resolve(this.sendToServerWhenAvalaible(r, isSkipable, label));
+                    }, 1000);
+                } else {
+                    //console.log('----> skip request');
+                    resolve({});
+                }
             });
         }
     }
@@ -802,10 +835,10 @@ export class AMuleCli {
      */
     public search(q: string, searchType: number = this.EC_SEARCH_TYPE.EC_SEARCH_KAD, strict = true): Promise<AMuleCliResponse> {
         q = q.trim();
-        return this.sendToServerWhenAvalaible(this._getSearchStartRequest(q, searchType)).then(res => {
+        return this.sendToServerWhenAvalaible(this._getSearchStartRequest(q, searchType), false, 'search').then(res => {
             if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
                 return new Promise((resolve, reject) => {
-                    let timeout = 120, frequency = 1500, count = 0, isSearchFinished = false;
+                    let timeout = 120, frequency = 2000, count = 0, isSearchFinished = false;
                     const intervalId = setInterval(() => {
                         if (isSearchFinished) {
                             clearInterval(intervalId);
@@ -813,8 +846,8 @@ export class AMuleCli {
                                 resolve(this.filterResultList(list, q, strict));
                             })
                         }
-                        this.sendToServerWhenAvalaible(this._isSearchFinished()).then(res => {
-                            if (res.children[0].value !== 0) {
+                        this.sendToServerWhenAvalaible(this._isSearchFinished(), true, '_isSearchFinished').then(res => {
+                            if (res.children && res.children[0].value !== 0) {
                                 isSearchFinished = true;
                             }
                         });
@@ -836,28 +869,30 @@ export class AMuleCli {
         });
     }
 
-    public fetchSearch(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getSearchResultRequest());
+    public fetchSearch(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getSearchResultRequest(), isSkipable, 'fetchSearch');
     }
 
     /**
      * get all the files being currently downloaded
      */
-    public getDownloads(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getDownloadsRequest()).then(elements => {
-            elements.children.map(f => {
-                ['partfile_last_recv', 'partfile_last_seen_comp'].map(key => {
-                    if (f[key]) {
-                        f[key + '_f'] = new Date(f[key] * 1000);
-                    }
+    public getDownloads(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getDownloadsRequest(), isSkipable, 'getDownloads').then(elements => {
+            if (elements.children) {
+                elements.children.map(f => {
+                    ['partfile_last_recv', 'partfile_last_seen_comp'].map(key => {
+                        if (f[key]) {
+                            f[key + '_f'] = new Date(f[key] * 1000);
+                        }
+                    });
+                    ['partfile_speed', 'completeness'].map(key => {
+                        if (!f[key]) {
+                            f[key] = 0;
+                        }
+                    });
+                    delete f.children;
                 });
-                ['partfile_speed'].map(key => {
-                    if (!f[key]) {
-                        f[key] = 0;
-                    }
-                });
-                delete f.children;
-            });
+            }
 
             return elements;
         });
@@ -869,14 +904,14 @@ export class AMuleCli {
      * @param e file to download (must have a hash)
      */
     public download(e): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.downloadRequest(e));
+        return this.sendToServerWhenAvalaible(this.downloadRequest(e), false, 'download');
     }
 
     /**
      * return the list of shared files
      */
-    public getSharedFiles(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest()).then(elements => {
+    public getSharedFiles(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest(), isSkipable, 'getSharedFiles').then(elements => {
             elements.children.map(f => {
                 ['knownfile_req_count_all', 'sharedRatio'].map(key => {
                     if (!f[key]) {
@@ -884,6 +919,11 @@ export class AMuleCli {
                     }
                 });
                 delete f.children;
+                // remove files being currently downloaded
+                if (f['knownfile_filename'].endsWith('.part')) {
+                    let index = elements.children.indexOf(f);
+                    elements.children.splice(index, 1);
+                }
             });
             return elements;
         });
@@ -892,35 +932,41 @@ export class AMuleCli {
     /**
      * 
      */
-    public getDetailUpdate(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest(82));
+    public getDetailUpdate(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getStatsRequest(82), isSkipable, 'getDetailUpdate');
     }
 
     /**
      * EC_OP_CLEAR_COMPLETED
      */
-    public clearCompleted(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.simpleRequest(0x53));
+    public clearCompleted(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.simpleRequest(0x53), isSkipable, 'isSkipable');
     }
-    public getStatistiques(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest(10));
+    public getStatistiques(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getStatsRequest(10), isSkipable, 'getStatistiques');
+    }
+    public setMaxDownload(limit): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getSetMaxBandwithRequest(4867, limit), false, 'setMaxDownload');
+    }
+    public setMaxUpload(limit): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getSetMaxBandwithRequest(4868, limit), false, 'setMaxUpload');
     }
     public cancelDownload(e): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e));
+        return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e), false, 'cancelDownload');
     }
 
     /**
      * get user preferences (EC_OP_GET_PREFERENCES)
      */
-    public getPreferences(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getPreferencesRequest());
+    public getPreferences(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.getPreferencesRequest(), isSkipable, 'getPreferences');
     }
 
     /**
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
      */
-    public reloadSharedFiles(): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.simpleRequest(35));
+    public reloadSharedFiles(isSkipable?: boolean): Promise<AMuleCliResponse> {
+        return this.sendToServerWhenAvalaible(this.simpleRequest(35), isSkipable, 'reloadSharedFiles');
     }
 
 }

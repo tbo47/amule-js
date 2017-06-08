@@ -6,23 +6,8 @@ It works with [chrome-apps](https://developer.chrome.com/apps/about_apps), [nw.j
 
 ## Example in  nodejs
 
-Run an example on node:
+Read and execute the nodejs examples:
 
-```
-npm install && npm start
-```
-
-## API
-
-```javascript
-let aMule = new aMuleModule.AMuleCli('127.0.0.1', 4712, 'password', md5);
-aMule.setTextDecoder(new TextDecoder());
-
-aMule.connect().then(m => {
-
-  aMule.getSharedFiles().then(res => {
-    res.children.forEach(e => console.log(e.value));
-  });
-
-});
-```
+* [amule-js-node-ex1.ts](amule-js-node-ex1.ts) to list the shared files
+* [amule-js-node-ex2.ts](amule-js-node-ex2.ts) to trigger downloads after a search
+* [amule-js-node-ex3.ts](amule-js-node-ex3.ts) to export shared files list in html format

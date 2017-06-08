@@ -1,5 +1,6 @@
-## debug amule for fedora
+To understand the communication between amule and amule-js library it is necessary to compile amule with some more verbose log.
 
+## compile amule on fedora
 
 sudo dnf install git redhat-rpm-config gcc gcc-c++ make bison flex binutils-devel gettext-devel GeoIP-devel wxGTK-devel zlib-devel libpng-devel gd-devel libupnp-devel cryptopp-devel
 

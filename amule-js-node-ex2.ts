@@ -4,7 +4,7 @@ const StringDecoder = require('string_decoder').StringDecoder;
 
 /**
  * 
- * This example search for a keywork including the current date (ex: "linux 2017-06")
+ * This node script searches for a keywork including the current date (ex: "linux 2017-06")
  * and download the results list.
  * 
  * 

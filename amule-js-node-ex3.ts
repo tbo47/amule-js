@@ -3,7 +3,7 @@ const md5 = require('./node_modules/blueimp-md5/js/md5.js');
 const StringDecoder = require('string_decoder').StringDecoder;
 
 /**
- * This example refresh the shared files list and print as html
+ * This node script refreshes the shared files list and print as html
  * 
  * 
  * Run 

@@ -3,7 +3,7 @@ const md5 = require('./node_modules/blueimp-md5/js/md5.js');
 const StringDecoder = require('string_decoder').StringDecoder;
 /**
  * 
- * This example connects to amule and print the shared files list to the console
+ * This node script connects to amule and print the shared files list to the console
  * 
  * 
  * Run 

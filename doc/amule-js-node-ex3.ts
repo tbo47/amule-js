@@ -1,5 +1,5 @@
 import aMuleModule = require('../amule-ts');
-const md5 = require('./node_modules/blueimp-md5/js/md5.js');
+const md5 = require('../node_modules/blueimp-md5/js/md5.js');
 const StringDecoder = require('string_decoder').StringDecoder;
 
 /**

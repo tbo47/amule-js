@@ -3,3 +3,4 @@
 dist/
 .settings/
 amule-ts.js
+package-lock.json

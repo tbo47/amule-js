@@ -1,4 +1,4 @@
-var AMuleCliResponse = (function () {
+var AMuleCliResponse = /** @class */ (function () {
     function AMuleCliResponse() {
         this.totalSizeOfRequest = 0;
         this.opCode = null;
@@ -9,7 +9,7 @@ var AMuleCliResponse = (function () {
     }
     return AMuleCliResponse;
 }());
-var AMuleCli = (function () {
+var AMuleCli = /** @class */ (function () {
     function AMuleCli(ip, port, password, md5Function) {
         this.isConnected = false;
         this.offset = 0; // use internally to read bit stream from server
@@ -129,6 +129,7 @@ var AMuleCli = (function () {
             for (var m = 0; m < children.length; m++) {
                 // console.log("child " + children[m].ecTag + " " + children[m].ecOp + " " + children[m].value);
                 childrenTagsLength += this._buildTagArrayBuffer(children[m].ecTag, children[m].ecOp, children[m].value, null);
+                // console.log("childrenTagsLength : " + childrenTagsLength);
             }
             dv.setUint16(0, children.length, false);
         }
@@ -794,7 +795,7 @@ var AMuleCli = (function () {
                 }
                 else {
                     //console.log('----> skip request');
-                    resolve({});
+                    resolve(new AMuleCliResponse());
                 }
             });
         }

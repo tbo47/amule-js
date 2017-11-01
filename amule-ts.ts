@@ -808,7 +808,7 @@ export class AMuleCli {
                     }, 1000);
                 } else {
                     //console.log('----> skip request');
-                    resolve({});
+                    resolve(new AMuleCliResponse());
                 }
             });
         }

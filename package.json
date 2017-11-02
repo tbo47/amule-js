@@ -4,7 +4,7 @@
   "description": "javascript client for amule",
   "main": "amule-js.js",
   "dependencies": {
-    "blueimp-md5": "^2.3.0"
+    "blueimp-md5": "^2.10.0"
   },
   "devDependencies": {
     "nodemon": "^1.11.0",

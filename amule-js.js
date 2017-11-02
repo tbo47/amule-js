@@ -804,8 +804,9 @@ var AMuleCli = /** @class */ (function () {
         if (strict && list.children) {
             list.children = list.children.filter(function (e) {
                 var isPresent = true;
+                var fileName = e['partfile_name'];
                 q.split(' ').map(function (r) {
-                    if (e['partfile_name'] && e['partfile_name'].toLowerCase().indexOf(r) === -1) {
+                    if (fileName && fileName.toLowerCase().indexOf(r.toLowerCase()) === -1) {
                         isPresent = false;
                     }
                 });

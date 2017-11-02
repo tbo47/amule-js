@@ -818,8 +818,9 @@ export class AMuleCli {
         if (strict && list.children) {
             list.children = list.children.filter(e => {
                 let isPresent = true;
+                const fileName = e['partfile_name']
                 q.split(' ').map(r => {
-                    if (e['partfile_name'] && e['partfile_name'].toLowerCase().indexOf(r) === -1) {
+                    if (fileName && fileName.toLowerCase().indexOf(r.toLowerCase()) === -1) {
                         isPresent = false;
                     }
                 });

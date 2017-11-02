@@ -77,7 +77,6 @@ var AMuleCli = /** @class */ (function () {
             { EC_TAG_STATS_UL_SPEED: 512 }, { EC_TAG_STATS_DL_SPEED: 513 }, { EC_TAG_STATS_UL_SPEED_LIMIT: 514 }, { EC_TAG_STATS_DL_SPEED_LIMIT: 515 },
             { EC_TAG_PREFS_DIRECTORIES: 6656 }, { EC_TAG_DIRECTORIES_INCOMING: 6657 }, { EC_TAG_DIRECTORIES_TEMP: 6658 }
         ];
-        this.client = null; // node socket
         this.isRunningPromise = false;
         this.ip = ip;
         this.port = port;
@@ -690,7 +689,7 @@ var AMuleCli = /** @class */ (function () {
             else {
                 _this.client = new net.Socket(); // return a Node socket
                 _this.client.connect(port, ip);
-                _this.client.on('connect', function () { return resolve(); });
+                _this.client.once('connect', resolve);
             }
         });
     };
@@ -704,7 +703,7 @@ var AMuleCli = /** @class */ (function () {
             }
             else {
                 _this.client.write(_this.toBuffer(data));
-                _this.client.on('data', function (data) { return resolve(_this.toArrayBuffer(data)); });
+                _this.client.once('data', function (data) { return resolve(_this.toArrayBuffer(data)); });
             }
         });
     };
@@ -740,6 +739,9 @@ var AMuleCli = /** @class */ (function () {
                             o_1 = o_1 + b.byteLength;
                         });
                         clearInterval(intervalId);
+                        if (_this.client) {
+                            _this.client.removeAllListeners('data');
+                        }
                         resolve(buffer_1);
                     }
                 }
@@ -786,7 +788,7 @@ var AMuleCli = /** @class */ (function () {
             });
         }
         else {
-            //console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
+            console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
             return new Promise(function (resolve, reject) {
                 if (!isSkipable) {
                     setTimeout(function () {
@@ -835,7 +837,7 @@ var AMuleCli = /** @class */ (function () {
                             });
                         }
                         _this.sendToServerWhenAvalaible(_this._isSearchFinished(), true, '_isSearchFinished').then(function (res) {
-                            if (res.children && res.children[0].value !== 0) {
+                            if (res.children && res.children[0] && res.children[0].value !== 0) {
                                 isSearchFinished = true;
                             }
                         });

@@ -682,7 +682,7 @@ export class AMuleCli {
         });
     };
 
-    private client = null; // node socket
+    private client; // node socket
     private socketId; // chrome API socket id
 
     private toBuffer(ab) {
@@ -707,7 +707,7 @@ export class AMuleCli {
             } else {
                 this.client = new net.Socket(); // return a Node socket
                 this.client.connect(port, ip);
-                this.client.on('connect', () => resolve());
+                this.client.once('connect', resolve);
             }
         });
     };
@@ -719,7 +719,7 @@ export class AMuleCli {
                 chrome.sockets.tcp.onReceive.addListener(receiveInfo => resolve(receiveInfo.data));
             } else {
                 this.client.write(this.toBuffer(data));
-                this.client.on('data', data => resolve(this.toArrayBuffer(data)));
+                this.client.once('data', data => resolve(this.toArrayBuffer(data)));
             }
         });
     };
@@ -756,6 +756,9 @@ export class AMuleCli {
                             o = o + b.byteLength;
                         });
                         clearInterval(intervalId);
+                        if (this.client) {
+                            this.client.removeAllListeners('data')
+                        }
                         resolve(buffer);
                     }
                 }
@@ -800,7 +803,7 @@ export class AMuleCli {
                 return this.readResultsList(data)
             });
         } else {
-            //console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
+            console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
             return new Promise((resolve, reject) => {
                 if (!isSkipable) {
                     setTimeout(() => {
@@ -847,7 +850,7 @@ export class AMuleCli {
                             })
                         }
                         this.sendToServerWhenAvalaible(this._isSearchFinished(), true, '_isSearchFinished').then(res => {
-                            if (res.children && res.children[0].value !== 0) {
+                            if (res.children && res.children[0] && res.children[0].value !== 0) {
                                 isSearchFinished = true;
                             }
                         });

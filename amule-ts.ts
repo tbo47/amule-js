@@ -803,14 +803,12 @@ export class AMuleCli {
                 return this.readResultsList(data)
             });
         } else {
-            console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
             return new Promise((resolve, reject) => {
                 if (!isSkipable) {
                     setTimeout(() => {
                         resolve(this.sendToServerWhenAvalaible(r, isSkipable, label));
                     }, 1000);
                 } else {
-                    //console.log('----> skip request');
                     resolve(new AMuleCliResponse());
                 }
             });

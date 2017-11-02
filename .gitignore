@@ -2,5 +2,6 @@
 .project
 dist/
 .settings/
+.vscode/
 amule-ts.js
 package-lock.json

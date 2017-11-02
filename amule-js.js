@@ -788,7 +788,6 @@ var AMuleCli = /** @class */ (function () {
             });
         }
         else {
-            console.log('--> this request is going to be piled. isSkipable: ' + isSkipable + ' ' + label);
             return new Promise(function (resolve, reject) {
                 if (!isSkipable) {
                     setTimeout(function () {
@@ -796,7 +795,6 @@ var AMuleCli = /** @class */ (function () {
                     }, 1000);
                 }
                 else {
-                    //console.log('----> skip request');
                     resolve(new AMuleCliResponse());
                 }
             });

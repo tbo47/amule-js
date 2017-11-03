@@ -356,7 +356,7 @@ export class AMuleCli {
      *        EC_TAG_PARTFILE_CAT tagName:783 dataType:2 dataLen:1 = 0
      *  > EC_OP_STRINGS opCode:6 size:3 (compressed: 2)
      */
-    private downloadRequest(e) {
+    private downloadRequest(e): ArrayBuffer {
         this._setHeadersToRequest(this.ECOpCodes.EC_OP_DOWNLOAD_SEARCH_RESULT);//42
         let tagCount = 0;
         const children = [{
@@ -666,30 +666,29 @@ export class AMuleCli {
         }
         return response;
     }
-    private readResultsList(buffer): Promise<AMuleCliResponse> {
-        return new Promise<AMuleCliResponse>((resolve, reject) => {
-            let response = this._readHeader(buffer);
-            switch (response.opCode) {
-                case 1: response.opCodeLabel = 'EC_OP_NOOP'; break;
-                case 5: response.opCodeLabel = 'EC_OP_FAILED'; break;
-                case 31: response.opCodeLabel = 'EC_OP_DLOAD_QUEUE'; break;
-                case 40: response.opCodeLabel = 'EC_OP_SEARCH_RESULTS'; break;
-                default: ;
-            }
-            this.readBufferChildren(buffer, response);
-            this._formatResultsList(response);
-            resolve(response);
-        });
+
+    private readResultsList(buffer): AMuleCliResponse {
+        let response = this._readHeader(buffer);
+        switch (response.opCode) {
+            case 1: response.opCodeLabel = 'EC_OP_NOOP'; break;
+            case 5: response.opCodeLabel = 'EC_OP_FAILED'; break;
+            case 31: response.opCodeLabel = 'EC_OP_DLOAD_QUEUE'; break;
+            case 40: response.opCodeLabel = 'EC_OP_SEARCH_RESULTS'; break;
+            default: ;
+        }
+        this.readBufferChildren(buffer, response);
+        this._formatResultsList(response);
+        return response;
     };
 
     private client; // node socket
     private socketId; // chrome API socket id
 
-    private toBuffer(ab) {
+    private toBuffer(ab): Buffer {
         return new Buffer(new Uint8Array(ab));
     }
 
-    private toArrayBuffer(buf) {
+    private toArrayBuffer(buf): ArrayBuffer {
         return new Uint8Array(buf).buffer;
     }
 
@@ -712,7 +711,7 @@ export class AMuleCli {
         });
     };
 
-    private sendToServer_simple(data) {
+    private sendToServer_simple(data): Promise<ArrayBuffer> {
         return new Promise((resolve, reject) => {
             if (typeof chrome !== 'undefined') {
                 chrome.sockets.tcp.send(this.socketId, data, r => { });
@@ -793,16 +792,14 @@ export class AMuleCli {
      * Make the promises flow synchronized
      */
     private sendToServerWhenAvalaible(r: ArrayBuffer, isSkipable: boolean, label: string): Promise<AMuleCliResponse> {
-        // console.log(label);
-        // console.time(label);
         if (!this.isRunningPromise) {
             this.isRunningPromise = true;
             return this.sendToServer(r).then(data => {
                 this.isRunningPromise = false;
-                // console.timeEnd(label);
                 return this.readResultsList(data)
             });
         } else {
+            console.log("delayed")
             return new Promise((resolve, reject) => {
                 if (!isSkipable) {
                     setTimeout(() => {
@@ -905,8 +902,8 @@ export class AMuleCli {
      * 
      * @param e file to download (must have a hash)
      */
-    public download(e): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.downloadRequest(e), false, 'download');
+    public download(e): Promise<ArrayBuffer> {
+        return this.sendToServer_simple(this.downloadRequest(e));
     }
 
     /**

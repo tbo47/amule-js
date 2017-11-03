@@ -24,18 +24,16 @@ aMule.connect().then(m => {
   let monthStr: string = ('00' + month).slice(-2);
   let year: number = dateObj.getUTCFullYear();
 
-  const q: string = 'clo2 ' + year + '-' + monthStr;
+  let q: string = 'clo2 ' + year + '-' + monthStr;
 
   aMule.search(q).then(result => {
-    
+
     console.log(result.children.length + ' results found for query: ' + q);
 
     result.children.map(e => {
       console.log(e['partfile_name']);
       aMule.download(e);
-    });
-
-    process.exit(0);
+    })
 
   });
 });

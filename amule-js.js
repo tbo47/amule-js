@@ -643,28 +643,25 @@ var AMuleCli = /** @class */ (function () {
         return response;
     };
     AMuleCli.prototype.readResultsList = function (buffer) {
-        var _this = this;
-        return new Promise(function (resolve, reject) {
-            var response = _this._readHeader(buffer);
-            switch (response.opCode) {
-                case 1:
-                    response.opCodeLabel = 'EC_OP_NOOP';
-                    break;
-                case 5:
-                    response.opCodeLabel = 'EC_OP_FAILED';
-                    break;
-                case 31:
-                    response.opCodeLabel = 'EC_OP_DLOAD_QUEUE';
-                    break;
-                case 40:
-                    response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
-                    break;
-                default: ;
-            }
-            _this.readBufferChildren(buffer, response);
-            _this._formatResultsList(response);
-            resolve(response);
-        });
+        var response = this._readHeader(buffer);
+        switch (response.opCode) {
+            case 1:
+                response.opCodeLabel = 'EC_OP_NOOP';
+                break;
+            case 5:
+                response.opCodeLabel = 'EC_OP_FAILED';
+                break;
+            case 31:
+                response.opCodeLabel = 'EC_OP_DLOAD_QUEUE';
+                break;
+            case 40:
+                response.opCodeLabel = 'EC_OP_SEARCH_RESULTS';
+                break;
+            default: ;
+        }
+        this.readBufferChildren(buffer, response);
+        this._formatResultsList(response);
+        return response;
     };
     ;
     AMuleCli.prototype.toBuffer = function (ab) {
@@ -777,17 +774,15 @@ var AMuleCli = /** @class */ (function () {
      */
     AMuleCli.prototype.sendToServerWhenAvalaible = function (r, isSkipable, label) {
         var _this = this;
-        // console.log(label);
-        // console.time(label);
         if (!this.isRunningPromise) {
             this.isRunningPromise = true;
             return this.sendToServer(r).then(function (data) {
                 _this.isRunningPromise = false;
-                // console.timeEnd(label);
                 return _this.readResultsList(data);
             });
         }
         else {
+            console.log("delayed");
             return new Promise(function (resolve, reject) {
                 if (!isSkipable) {
                     setTimeout(function () {
@@ -890,7 +885,7 @@ var AMuleCli = /** @class */ (function () {
      * @param e file to download (must have a hash)
      */
     AMuleCli.prototype.download = function (e) {
-        return this.sendToServerWhenAvalaible(this.downloadRequest(e), false, 'download');
+        return this.sendToServer_simple(this.downloadRequest(e));
     };
     /**
      * return the list of shared files

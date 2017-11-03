@@ -104,7 +104,7 @@ export class AMuleCli {
     /**
      * Used internally to build a request
      */
-    private _buildTagArrayBuffer(ecTag, ecOp, value, children) {
+    private _buildTagArrayBuffer(ecTag: number, ecOp:number, value, children) {
         this.recurcifInBuildTagArrayBuffer++;
         var tagLength = 0;
         var dv = new DataView(new ArrayBuffer(Uint16Array.BYTES_PER_ELEMENT));
@@ -415,7 +415,7 @@ export class AMuleCli {
      *     EC_TAG_STATS_BANNED_COUNT tagName:519 dataType:2 dataLen:1 = 0
      *     ...
      */
-    private getStatsRequest(EC_OP = 10) {
+    private getStatsRequest(EC_OP = 10): ArrayBuffer {
         this._setHeadersToRequest(EC_OP); // EC_OP_STAT_REQ == 10
         let tagCount = 0;
         const EC_TAG_DETAIL_LEVEL = 4;
@@ -434,7 +434,7 @@ export class AMuleCli {
      *      EC_TAG_PREFS_GENERAL tagName:4608 dataType:1 dataLen:0 = empty
      *        EC_TAG_USER_NICK tagName:4609 dataType:6 dataLen:13 = name
      */
-    private getPreferencesRequest() {
+    private getPreferencesRequest(): ArrayBuffer {
         this._setHeadersToRequest(63);
         let tagCount = 0;
         const EC_TAG_DETAIL_LEVEL = 4;
@@ -456,7 +456,7 @@ export class AMuleCli {
         return this._finalizeRequest(1);
     };
 
-    private readSalt(buffer) {
+    private readSalt(buffer: ArrayBuffer) {
         let offset: number = Uint32Array.BYTES_PER_ELEMENT * 2;
         let dataView: DataView = new DataView(buffer, offset, Uint8Array.BYTES_PER_ELEMENT);
         this.responseOpcode = dataView.getUint8(0);
@@ -485,7 +485,7 @@ export class AMuleCli {
         return this.responseOpcode;
     };
 
-    private readBuffer(buffer, byteNumberToRead, littleEndian = false) {
+    private readBuffer(buffer: ArrayBuffer, byteNumberToRead: number, littleEndian = false) {
         let val = null;
         const dataView = new DataView(buffer, this.offset, byteNumberToRead);
         if (byteNumberToRead === 1) {
@@ -499,7 +499,7 @@ export class AMuleCli {
         return val;
     };
 
-    private readBufferChildren(buffer, res, recursivity = 1) {
+    private readBufferChildren(buffer: ArrayBuffer, res, recursivity = 1) {
         res.children = [];
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
@@ -604,7 +604,7 @@ export class AMuleCli {
         return child2.value;
     }
 
-    private _readHeader(buffer): AMuleCliResponse {
+    private _readHeader(buffer: ArrayBuffer): AMuleCliResponse {
         this.offset = 0;
         let response = new AMuleCliResponse();
         response.header = this.readBuffer(buffer, 4);
@@ -667,7 +667,7 @@ export class AMuleCli {
         return response;
     }
 
-    private readResultsList(buffer): AMuleCliResponse {
+    private readResultsList(buffer: ArrayBuffer): AMuleCliResponse {
         let response = this._readHeader(buffer);
         switch (response.opCode) {
             case 1: response.opCodeLabel = 'EC_OP_NOOP'; break;
@@ -684,24 +684,24 @@ export class AMuleCli {
     private client; // node socket
     private socketId; // chrome API socket id
 
-    private toBuffer(ab): Buffer {
+    private toBuffer(ab: ArrayBuffer): Buffer {
         return new Buffer(new Uint8Array(ab));
     }
 
-    private toArrayBuffer(buf): ArrayBuffer {
+    private toArrayBuffer(buf: ArrayBuffer): ArrayBuffer {
         return new Uint8Array(buf).buffer;
     }
 
     /**
      * Create a TCP socket with the server.
      */
-    private initConnToServer(ip, port) {
+    private initConnToServer(ip, port): Promise<any> {
         return new Promise((resolve, reject) => {
             if (typeof chrome !== 'undefined') {
                 console.log("using chrome API");
                 chrome.sockets.tcp.create({}, r => {
                     this.socketId = r.socketId;
-                    chrome.sockets.tcp.connect(r.socketId, ip, port, code => resolve(code));
+                    chrome.sockets.tcp.connect(r.socketId, ip, port, resolve);
                 });
             } else {
                 this.client = new net.Socket(); // return a Node socket
@@ -711,7 +711,7 @@ export class AMuleCli {
         });
     };
 
-    private sendToServer_simple(data): Promise<ArrayBuffer> {
+    private sendToServer_simple(data: ArrayBuffer): Promise<ArrayBuffer> {
         return new Promise((resolve, reject) => {
             if (typeof chrome !== 'undefined') {
                 chrome.sockets.tcp.send(this.socketId, data, r => { });
@@ -723,7 +723,7 @@ export class AMuleCli {
         });
     };
 
-    private sendToServer(data) {
+    private sendToServer(data: ArrayBuffer): Promise<ArrayBuffer> {
         return new Promise((resolve, reject) => {
 
             let buf = [], totalSizeOfRequest, frequency = 100, timeout = 200, count = 0;
@@ -762,14 +762,14 @@ export class AMuleCli {
                     }
                 }
                 if (count++ > timeout) {
-                    console.error('time out expired for this TCP request');
                     clearInterval(intervalId);
+                    throw 'time out expired for this TCP request';
                 }
             }, frequency);
         });
     };
 
-    public connect() {
+    public connect(): Promise<string> {
         return this.initConnToServer(this.ip, this.port).then(() => {
             return this.sendToServer_simple(this.getAuthRequest1());
         }).then(data => {
@@ -777,13 +777,13 @@ export class AMuleCli {
             return this.sendToServer_simple(this._getAuthRequest2());
         }).then(data => {
             if (this.readSalt(data) === 4) {
-                return ('You are successfuly connected to amule');
+                return 'You are successfuly connected to amule'
             }
             else {
-                throw ('You are NOT connected to amule');
+                throw 'You are NOT connected to amule'
             }
         }).catch(err => {
-            throw ('\n\nYou are NOT connected to amule: ' + err);
+            throw '\n\nYou are NOT connected to amule: ' + err
         });
     };
 
@@ -938,20 +938,20 @@ export class AMuleCli {
     /**
      * EC_OP_CLEAR_COMPLETED
      */
-    public clearCompleted(isSkipable?: boolean): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.simpleRequest(0x53), isSkipable, 'isSkipable');
+    public clearCompleted(isSkipable?: boolean): Promise<ArrayBuffer> {
+        return this.sendToServer_simple(this.simpleRequest(0x53));
     }
     public getStatistiques(isSkipable?: boolean): Promise<AMuleCliResponse> {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(10), isSkipable, 'getStatistiques');
     }
-    public setMaxDownload(limit): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getSetMaxBandwithRequest(4867, limit), false, 'setMaxDownload');
+    public setMaxDownload(limit): Promise<ArrayBuffer> {
+        return this.sendToServer_simple(this.getSetMaxBandwithRequest(4867, limit));
     }
-    public setMaxUpload(limit): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getSetMaxBandwithRequest(4868, limit), false, 'setMaxUpload');
+    public setMaxUpload(limit): Promise<ArrayBuffer> {
+        return this.sendToServer_simple(this.getSetMaxBandwithRequest(4868, limit));
     }
-    public cancelDownload(e): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e), false, 'cancelDownload');
+    public cancelDownload(e): Promise<ArrayBuffer> {
+        return this.sendToServer_simple(this.getCancelDownloadRequest(e));
     }
 
     /**
@@ -964,8 +964,8 @@ export class AMuleCli {
     /**
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
      */
-    public reloadSharedFiles(isSkipable?: boolean): Promise<AMuleCliResponse> {
-        return this.sendToServerWhenAvalaible(this.simpleRequest(35), isSkipable, 'reloadSharedFiles');
+    public reloadSharedFiles(isSkipable?: boolean): Promise<ArrayBuffer> {
+        return this.sendToServer_simple(this.simpleRequest(35));
     }
 
 }

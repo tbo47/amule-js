@@ -680,7 +680,7 @@ var AMuleCli = /** @class */ (function () {
                 console.log("using chrome API");
                 chrome.sockets.tcp.create({}, function (r) {
                     _this.socketId = r.socketId;
-                    chrome.sockets.tcp.connect(r.socketId, ip, port, function (code) { return resolve(code); });
+                    chrome.sockets.tcp.connect(r.socketId, ip, port, resolve);
                 });
             }
             else {
@@ -743,8 +743,8 @@ var AMuleCli = /** @class */ (function () {
                     }
                 }
                 if (count++ > timeout) {
-                    console.error('time out expired for this TCP request');
                     clearInterval(intervalId);
+                    throw 'time out expired for this TCP request';
                 }
             }, frequency);
         });
@@ -759,13 +759,13 @@ var AMuleCli = /** @class */ (function () {
             return _this.sendToServer_simple(_this._getAuthRequest2());
         }).then(function (data) {
             if (_this.readSalt(data) === 4) {
-                return ('You are successfuly connected to amule');
+                return 'You are successfuly connected to amule';
             }
             else {
-                throw ('You are NOT connected to amule');
+                throw 'You are NOT connected to amule';
             }
         })["catch"](function (err) {
-            throw ('\n\nYou are NOT connected to amule: ' + err);
+            throw '\n\nYou are NOT connected to amule: ' + err;
         });
     };
     ;
@@ -918,19 +918,19 @@ var AMuleCli = /** @class */ (function () {
      * EC_OP_CLEAR_COMPLETED
      */
     AMuleCli.prototype.clearCompleted = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.simpleRequest(0x53), isSkipable, 'isSkipable');
+        return this.sendToServer_simple(this.simpleRequest(0x53));
     };
     AMuleCli.prototype.getStatistiques = function (isSkipable) {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(10), isSkipable, 'getStatistiques');
     };
     AMuleCli.prototype.setMaxDownload = function (limit) {
-        return this.sendToServerWhenAvalaible(this.getSetMaxBandwithRequest(4867, limit), false, 'setMaxDownload');
+        return this.sendToServer_simple(this.getSetMaxBandwithRequest(4867, limit));
     };
     AMuleCli.prototype.setMaxUpload = function (limit) {
-        return this.sendToServerWhenAvalaible(this.getSetMaxBandwithRequest(4868, limit), false, 'setMaxUpload');
+        return this.sendToServer_simple(this.getSetMaxBandwithRequest(4868, limit));
     };
     AMuleCli.prototype.cancelDownload = function (e) {
-        return this.sendToServerWhenAvalaible(this.getCancelDownloadRequest(e), false, 'cancelDownload');
+        return this.sendToServer_simple(this.getCancelDownloadRequest(e));
     };
     /**
      * get user preferences (EC_OP_GET_PREFERENCES)
@@ -942,7 +942,7 @@ var AMuleCli = /** @class */ (function () {
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
      */
     AMuleCli.prototype.reloadSharedFiles = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.simpleRequest(35), isSkipable, 'reloadSharedFiles');
+        return this.sendToServer_simple(this.simpleRequest(35));
     };
     return AMuleCli;
 }());

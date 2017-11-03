@@ -2,7 +2,7 @@
 import * as net from 'net';
 
 class AMuleCliResponse {
-    public header: string;
+    public header: number;
     public totalSizeOfRequest: number = 0;
     public opCode = null;
     public tagCountInResponse: number;
@@ -104,7 +104,7 @@ export class AMuleCli {
     /**
      * Used internally to build a request
      */
-    private _buildTagArrayBuffer(ecTag: number, ecOp:number, value, children) {
+    private _buildTagArrayBuffer(ecTag: number, ecOp: number, value, children) {
         this.recurcifInBuildTagArrayBuffer++;
         var tagLength = 0;
         var dv = new DataView(new ArrayBuffer(Uint16Array.BYTES_PER_ELEMENT));
@@ -246,10 +246,8 @@ export class AMuleCli {
     /**
      * The first request trigger a 8 bytes number to be associate with the
      * session (the salt number).
-     *
-     * @returns {ArrayBuffer}
      */
-    private getAuthRequest1() {
+    private getAuthRequest1(): ArrayBuffer {
         this._setHeadersToRequest(2);//EC_OP_AUTH_REQ
         let tagCount = 0;
         this._buildTagArrayBuffer(this.ECTagNames.EC_TAG_CLIENT_NAME * 2, this.ECOpCodes.EC_OP_STRINGS, "amule-js\0", null);
@@ -263,10 +261,8 @@ export class AMuleCli {
 
     /**
      * When the solt number (aka session id) is given by the server, we can auth
-     *
-     * @returns {ArrayBuffer}
      */
-    private _getAuthRequest2() {
+    private _getAuthRequest2(): ArrayBuffer {
         this._setHeadersToRequest(80);
         let tagCount = 0;
         let passwd = this.md5(this.md5Password + this.md5(this.solt));
@@ -329,7 +325,7 @@ export class AMuleCli {
     /**
      *
      */
-    private getSharedFilesRequest() {
+    private getSharedFilesRequest(): ArrayBuffer {
         this._setHeadersToRequest(this.ECCodes.EC_OP_GET_SHARED_FILES);
         return this._finalizeRequest(0);
     };
@@ -337,7 +333,7 @@ export class AMuleCli {
     /**
      *
      */
-    private getSearchResultRequest() {
+    private getSearchResultRequest(): ArrayBuffer {
         this._setHeadersToRequest(this.ECOpCodes.EC_OP_SEARCH_RESULTS);
         let tagCount = 0;
         this._buildTagArrayBuffer(8, this.ECOpCodes.EC_TAGTYPE_UINT8, this.EC_SEARCH_TYPE.EC_SEARCH_LOCA, null);
@@ -345,7 +341,7 @@ export class AMuleCli {
         return this._finalizeRequest(tagCount);
     };
 
-    private getDownloadsRequest() {
+    private getDownloadsRequest(): ArrayBuffer {
         this._setHeadersToRequest(13); // EC_OP_GET_DLOAD_QUEUE
         return this._finalizeRequest(0);
     };
@@ -380,7 +376,7 @@ export class AMuleCli {
      *     EC_TAG_PREFS_CONNECTIONS tagName:4864 dataType:1 dataLen:0 = empty
      *       EC_TAG_CONN_MAX_UL tagName:4868 dataType:2 dataLen:1 = 0
      */
-    private getSetMaxBandwithRequest(tag: number, limit: number) {
+    private getSetMaxBandwithRequest(tag: number, limit: number): ArrayBuffer {
         this._setHeadersToRequest(64);
         let tagCount = 0;
         const children = [{
@@ -398,7 +394,7 @@ export class AMuleCli {
     /**
      *
      */
-    private simpleRequest(opCode: number) {
+    private simpleRequest(opCode: number): ArrayBuffer {
         this._setHeadersToRequest(opCode);
         return this._finalizeRequest(0);
     };
@@ -456,7 +452,7 @@ export class AMuleCli {
         return this._finalizeRequest(1);
     };
 
-    private readSalt(buffer: ArrayBuffer) {
+    private readSalt(buffer: ArrayBuffer): number {
         let offset: number = Uint32Array.BYTES_PER_ELEMENT * 2;
         let dataView: DataView = new DataView(buffer, offset, Uint8Array.BYTES_PER_ELEMENT);
         this.responseOpcode = dataView.getUint8(0);
@@ -485,7 +481,7 @@ export class AMuleCli {
         return this.responseOpcode;
     };
 
-    private readBuffer(buffer: ArrayBuffer, byteNumberToRead: number, littleEndian = false) {
+    private readBuffer(buffer: ArrayBuffer, byteNumberToRead: number, littleEndian = false): number {
         let val = null;
         const dataView = new DataView(buffer, this.offset, byteNumberToRead);
         if (byteNumberToRead === 1) {
@@ -528,17 +524,10 @@ export class AMuleCli {
         }
     };
 
-    private uintToString(uintArray) {
-        var encodedString = String.fromCharCode.apply(null, uintArray),
-            decodedString = decodeURIComponent(encodedString);
-        return decodedString;
-    }
-
     /**
      * Read the value of a node according to its type (typeEcOp) and size in the buffer
-     * @returns value
      */
-    private readValueOfANode(child2, buffer) {
+    private readValueOfANode(child2, buffer: ArrayBuffer) {
         if (!child2.length) {
             return '';
         }
@@ -631,7 +620,7 @@ export class AMuleCli {
     { EC_TAG_PREFS_DIRECTORIES: 6656 }, { EC_TAG_DIRECTORIES_INCOMING: 6657 }, { EC_TAG_DIRECTORIES_TEMP: 6658 }
     ];
 
-    private _formatResultsList(response): AMuleCliResponse {
+    private _formatResultsList(response: AMuleCliResponse): AMuleCliResponse {
         response.children.map(e => {
             this.EC_TAG_MAPPING.map(REF => {
                 Object.keys(REF).map(key => {
@@ -695,7 +684,7 @@ export class AMuleCli {
     /**
      * Create a TCP socket with the server.
      */
-    private initConnToServer(ip, port): Promise<any> {
+    private initConnToServer(ip: string, port: number): Promise<any> {
         return new Promise((resolve, reject) => {
             if (typeof chrome !== 'undefined') {
                 console.log("using chrome API");

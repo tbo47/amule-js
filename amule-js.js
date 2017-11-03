@@ -1,5 +1,5 @@
-var AMuleCliResponse = /** @class */ (function () {
-    function AMuleCliResponse() {
+var Response = /** @class */ (function () {
+    function Response() {
         this.totalSizeOfRequest = 0;
         this.opCode = null;
         this.children = [];
@@ -7,7 +7,7 @@ var AMuleCliResponse = /** @class */ (function () {
         this.sourceCountXfer = 0;
         this.status = 0;
     }
-    return AMuleCliResponse;
+    return Response;
 }());
 var AMuleCli = /** @class */ (function () {
     function AMuleCli(ip, port, password, md5Function) {
@@ -233,8 +233,6 @@ var AMuleCli = /** @class */ (function () {
     /**
      * The first request trigger a 8 bytes number to be associate with the
      * session (the salt number).
-     *
-     * @returns {ArrayBuffer}
      */
     AMuleCli.prototype.getAuthRequest1 = function () {
         this._setHeadersToRequest(2); //EC_OP_AUTH_REQ
@@ -250,8 +248,6 @@ var AMuleCli = /** @class */ (function () {
     ;
     /**
      * When the solt number (aka session id) is given by the server, we can auth
-     *
-     * @returns {ArrayBuffer}
      */
     AMuleCli.prototype._getAuthRequest2 = function () {
         this._setHeadersToRequest(80);
@@ -490,14 +486,12 @@ var AMuleCli = /** @class */ (function () {
         if (recursivity === void 0) { recursivity = 1; }
         res.children = [];
         for (var j = 0; j < res.tagCountInResponse; j++) {
-            var child = {
-                nameEcTag: this.readBuffer(buffer, 2),
-                typeEcOp: this.readBuffer(buffer, 1),
-                length: this.readBuffer(buffer, 4),
-                tagCountInResponse: 0,
-                children: [],
-                value: ''
-            };
+            var child = new Response();
+            child.nameEcTag = this.readBuffer(buffer, 2);
+            child.typeEcOp = this.readBuffer(buffer, 1);
+            child.length = this.readBuffer(buffer, 4); // length without ectag, ecOp, length and tag count BUT with children length
+            child.tagCountInResponse = 0;
+            child.value = '';
             res.length -= (7 + child.length); // remove header length + length
             if (child.nameEcTag % 2) {
                 child.nameEcTag = (child.nameEcTag - 1) / 2;
@@ -513,15 +507,11 @@ var AMuleCli = /** @class */ (function () {
         if (recursivity > 1) {
             res.value = this.readValueOfANode(res, buffer);
         }
+        return res;
     };
     ;
-    AMuleCli.prototype.uintToString = function (uintArray) {
-        var encodedString = String.fromCharCode.apply(null, uintArray), decodedString = decodeURIComponent(encodedString);
-        return decodedString;
-    };
     /**
      * Read the value of a node according to its type (typeEcOp) and size in the buffer
-     * @returns value
      */
     AMuleCli.prototype.readValueOfANode = function (child2, buffer) {
         if (!child2.length) {
@@ -594,7 +584,7 @@ var AMuleCli = /** @class */ (function () {
     };
     AMuleCli.prototype._readHeader = function (buffer) {
         this.offset = 0;
-        var response = new AMuleCliResponse();
+        var response = new Response();
         response.header = this.readBuffer(buffer, 4);
         // length (total minus header and response Length)
         var responseLength = this.readBuffer(buffer, 4);
@@ -790,7 +780,7 @@ var AMuleCli = /** @class */ (function () {
                     }, 1000);
                 }
                 else {
-                    resolve(new AMuleCliResponse());
+                    resolve(new Response());
                 }
             });
         }
@@ -820,37 +810,36 @@ var AMuleCli = /** @class */ (function () {
         if (strict === void 0) { strict = true; }
         q = q.trim();
         return this.sendToServerWhenAvalaible(this._getSearchStartRequest(q, searchType), false, 'search').then(function (res) {
-            if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
-                return new Promise(function (resolve, reject) {
-                    var timeout = 120, frequency = 2000, count = 0, isSearchFinished = false;
-                    var intervalId = setInterval(function () {
-                        if (isSearchFinished) {
-                            clearInterval(intervalId);
+            return new Promise(function (resolve, reject) {
+                if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
+                    var timeout_1 = 120, frequency = 2000, count_1 = 0, isSearchFinished_1 = false;
+                    var intervalId_1 = setInterval(function () {
+                        if (isSearchFinished_1) {
+                            clearInterval(intervalId_1);
                             _this.fetchSearch().then(function (list) {
                                 resolve(_this.filterResultList(list, q, strict));
                             });
                         }
                         _this.sendToServerWhenAvalaible(_this._isSearchFinished(), true, '_isSearchFinished').then(function (res) {
                             if (res.children && res.children[0] && res.children[0].value !== 0) {
-                                isSearchFinished = true;
+                                isSearchFinished_1 = true;
                             }
                         });
-                        if (count++ > timeout) {
+                        if (count_1++ > timeout_1) {
                             console.error('time out expired to fetch result');
-                            clearInterval(intervalId);
+                            clearInterval(intervalId_1);
                         }
                     }, frequency);
-                });
-            }
-            else if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
-                return new Promise(function (resolve, reject) {
+                }
+                else if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
+                    // TODO to improve
                     setTimeout(function () {
                         _this.fetchSearch().then(function (list) {
                             resolve(_this.filterResultList(list, q, strict));
                         });
                     }, 1500);
-                });
-            }
+                }
+            });
         });
     };
     AMuleCli.prototype.fetchSearch = function (isSkipable) {

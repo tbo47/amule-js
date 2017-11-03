@@ -1,18 +1,18 @@
 /// <reference path="node_modules/@types/chrome/chrome-app.d.ts"/>
 import * as net from 'net';
 
-class AMuleCliResponse {
+class Response {
     public header: number;
     public totalSizeOfRequest: number = 0;
     public opCode = null;
+    public typeEcOp: number;
     public tagCountInResponse: number;
     public opCodeLabel: string;
-    public children: AMuleCliResponse[] = [];
-    public nameEcTag;
-    public value;
-    public size; //size of a downloaded file
-    public length;
-    public sourceCount: number = 0;
+    public children: Response[] = [];
+    public nameEcTag: number;
+    public value: any;
+    public length: number;
+    public sourceCount = 0;
     public sourceCountXfer: number = 0;
     public status: number = 0;
 }
@@ -21,8 +21,8 @@ export class AMuleCli {
     private isConnected: Boolean = false;
     private offset: number = 0; // use internally to read bit stream from server
     private arrayBuffers = [];// used to build requests
-    private recurcifInBuildTagArrayBuffer: number = 0;
-    private responseOpcode: number = 0;// op code given in the server
+    private recurcifInBuildTagArrayBuffer = 0;
+    private responseOpcode = 0;// op code given in the server
 
     private ip: string;// server address
     private port: number;// server port
@@ -495,18 +495,18 @@ export class AMuleCli {
         return val;
     };
 
-    private readBufferChildren(buffer: ArrayBuffer, res, recursivity = 1) {
+    private readBufferChildren(buffer: ArrayBuffer, res: Response, recursivity = 1): Response {
         res.children = [];
 
         for (let j = 0; j < res.tagCountInResponse; j++) {
-            const child = {
-                nameEcTag: this.readBuffer(buffer, 2),
-                typeEcOp: this.readBuffer(buffer, 1),
-                length: this.readBuffer(buffer, 4), // length without ectag, ecOp, length and tag count BUT with children length
-                tagCountInResponse: 0,
-                children: [],
-                value: ''
-            };
+
+            const child = new Response();
+            child.nameEcTag = this.readBuffer(buffer, 2)
+            child.typeEcOp = this.readBuffer(buffer, 1)
+            child.length = this.readBuffer(buffer, 4) // length without ectag, ecOp, length and tag count BUT with children length
+            child.tagCountInResponse = 0
+            child.value = ''
+
             res.length -= (7 + child.length); // remove header length + length
 
             if (child.nameEcTag % 2) {// if name (ecTag) is odd there is a child count
@@ -522,12 +522,13 @@ export class AMuleCli {
         if (recursivity > 1) {
             res.value = this.readValueOfANode(res, buffer);
         }
+        return res;
     };
 
     /**
      * Read the value of a node according to its type (typeEcOp) and size in the buffer
      */
-    private readValueOfANode(child2, buffer: ArrayBuffer) {
+    private readValueOfANode(child2: Response, buffer: ArrayBuffer) {
         if (!child2.length) {
             return '';
         }
@@ -593,9 +594,9 @@ export class AMuleCli {
         return child2.value;
     }
 
-    private _readHeader(buffer: ArrayBuffer): AMuleCliResponse {
+    private _readHeader(buffer: ArrayBuffer): Response {
         this.offset = 0;
-        let response = new AMuleCliResponse();
+        let response = new Response();
         response.header = this.readBuffer(buffer, 4);
         // length (total minus header and response Length)
         let responseLength = this.readBuffer(buffer, 4);
@@ -620,7 +621,7 @@ export class AMuleCli {
     { EC_TAG_PREFS_DIRECTORIES: 6656 }, { EC_TAG_DIRECTORIES_INCOMING: 6657 }, { EC_TAG_DIRECTORIES_TEMP: 6658 }
     ];
 
-    private _formatResultsList(response: AMuleCliResponse): AMuleCliResponse {
+    private _formatResultsList(response: Response): Response {
         response.children.map(e => {
             this.EC_TAG_MAPPING.map(REF => {
                 Object.keys(REF).map(key => {
@@ -656,7 +657,7 @@ export class AMuleCli {
         return response;
     }
 
-    private readResultsList(buffer: ArrayBuffer): AMuleCliResponse {
+    private readResultsList(buffer: ArrayBuffer): Response {
         let response = this._readHeader(buffer);
         switch (response.opCode) {
             case 1: response.opCodeLabel = 'EC_OP_NOOP'; break;
@@ -780,7 +781,7 @@ export class AMuleCli {
     /**
      * Make the promises flow synchronized
      */
-    private sendToServerWhenAvalaible(r: ArrayBuffer, isSkipable: boolean, label: string): Promise<AMuleCliResponse> {
+    private sendToServerWhenAvalaible(r: ArrayBuffer, isSkipable: boolean, label: string): Promise<Response> {
         if (!this.isRunningPromise) {
             this.isRunningPromise = true;
             return this.sendToServer(r).then(data => {
@@ -795,12 +796,12 @@ export class AMuleCli {
                         resolve(this.sendToServerWhenAvalaible(r, isSkipable, label));
                     }, 1000);
                 } else {
-                    resolve(new AMuleCliResponse());
+                    resolve(new Response());
                 }
             });
         }
     }
-    private filterResultList(list: AMuleCliResponse, q: string, strict: boolean): AMuleCliResponse {
+    private filterResultList(list: Response, q: string, strict: boolean): Response {
         if (strict && list.children) {
             list.children = list.children.filter(e => {
                 let isPresent = true;
@@ -821,11 +822,11 @@ export class AMuleCli {
      * Search on the server
      * 
      */
-    public search(q: string, searchType: number = this.EC_SEARCH_TYPE.EC_SEARCH_KAD, strict = true): Promise<AMuleCliResponse> {
+    public search(q: string, searchType: number = this.EC_SEARCH_TYPE.EC_SEARCH_KAD, strict = true): Promise<Response> {
         q = q.trim();
         return this.sendToServerWhenAvalaible(this._getSearchStartRequest(q, searchType), false, 'search').then(res => {
-            if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
-                return new Promise((resolve, reject) => {
+            return new Promise<Response>((resolve, reject) => {
+                if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
                     let timeout = 120, frequency = 2000, count = 0, isSearchFinished = false;
                     const intervalId = setInterval(() => {
                         if (isSearchFinished) {
@@ -844,27 +845,26 @@ export class AMuleCli {
                             clearInterval(intervalId);
                         }
                     }, frequency);
-                });
-            } else if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
-                return new Promise((resolve, reject) => {
+                } else if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
+                    // TODO to improve
                     setTimeout(() => {
                         this.fetchSearch().then(list => {
                             resolve(this.filterResultList(list, q, strict));
                         })
                     }, 1500);
-                });
-            }
+                }
+            });
         });
     }
 
-    public fetchSearch(isSkipable?: boolean): Promise<AMuleCliResponse> {
+    public fetchSearch(isSkipable?: boolean): Promise<Response> {
         return this.sendToServerWhenAvalaible(this.getSearchResultRequest(), isSkipable, 'fetchSearch');
     }
 
     /**
      * get all the files being currently downloaded
      */
-    public getDownloads(isSkipable?: boolean): Promise<AMuleCliResponse> {
+    public getDownloads(isSkipable?: boolean): Promise<Response> {
         return this.sendToServerWhenAvalaible(this.getDownloadsRequest(), isSkipable, 'getDownloads').then(elements => {
             if (elements.children) {
                 elements.children.map(f => {
@@ -898,7 +898,7 @@ export class AMuleCli {
     /**
      * return the list of shared files
      */
-    public getSharedFiles(isSkipable?: boolean): Promise<AMuleCliResponse> {
+    public getSharedFiles(isSkipable?: boolean): Promise<Response> {
         return this.sendToServerWhenAvalaible(this.getSharedFilesRequest(), isSkipable, 'getSharedFiles').then(elements => {
             elements.children.map(f => {
                 ['knownfile_req_count_all', 'sharedRatio'].map(key => {
@@ -920,7 +920,7 @@ export class AMuleCli {
     /**
      * 
      */
-    public getDetailUpdate(isSkipable?: boolean): Promise<AMuleCliResponse> {
+    public getDetailUpdate(isSkipable?: boolean): Promise<Response> {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(82), isSkipable, 'getDetailUpdate');
     }
 
@@ -930,7 +930,7 @@ export class AMuleCli {
     public clearCompleted(isSkipable?: boolean): Promise<ArrayBuffer> {
         return this.sendToServer_simple(this.simpleRequest(0x53));
     }
-    public getStatistiques(isSkipable?: boolean): Promise<AMuleCliResponse> {
+    public getStatistiques(isSkipable?: boolean): Promise<Response> {
         return this.sendToServerWhenAvalaible(this.getStatsRequest(10), isSkipable, 'getStatistiques');
     }
     public setMaxDownload(limit): Promise<ArrayBuffer> {
@@ -946,7 +946,7 @@ export class AMuleCli {
     /**
      * get user preferences (EC_OP_GET_PREFERENCES)
      */
-    public getPreferences(isSkipable?: boolean): Promise<AMuleCliResponse> {
+    public getPreferences(isSkipable?: boolean): Promise<Response> {
         return this.sendToServerWhenAvalaible(this.getPreferencesRequest(), isSkipable, 'getPreferences');
     }
 

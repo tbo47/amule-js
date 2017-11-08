@@ -713,8 +713,8 @@ export class AMuleCli {
         });
     };
 
-    private sendToServer(data: ArrayBuffer): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
+    private sendToServer(data: ArrayBuffer): Promise<Response> {
+        return new Promise<ArrayBuffer>((resolve, reject) => {
 
             let buf = [], totalSizeOfRequest, frequency = 100, timeout = 200, count = 0;
 
@@ -756,7 +756,7 @@ export class AMuleCli {
                     throw 'time out expired for this TCP request';
                 }
             }, frequency);
-        });
+        }).then(data => this.readResultsList(data))
     };
 
     public connect(): Promise<string> {
@@ -777,30 +777,6 @@ export class AMuleCli {
         });
     };
 
-    private isRunningPromise: boolean = false;
-    /**
-     * Make the promises flow synchronized
-     */
-    private sendToServerWhenAvalaible(r: ArrayBuffer, isSkipable: boolean, label: string): Promise<Response> {
-        if (!this.isRunningPromise) {
-            this.isRunningPromise = true;
-            return this.sendToServer(r).then(data => {
-                this.isRunningPromise = false;
-                return this.readResultsList(data)
-            });
-        } else {
-            console.log("delayed")
-            return new Promise((resolve, reject) => {
-                if (!isSkipable) {
-                    setTimeout(() => {
-                        resolve(this.sendToServerWhenAvalaible(r, isSkipable, label));
-                    }, 1000);
-                } else {
-                    resolve(new Response());
-                }
-            });
-        }
-    }
     private filterResultList(list: Response, q: string, strict: boolean): Response {
         if (strict && list.children) {
             list.children = list.children.filter(e => {
@@ -824,7 +800,7 @@ export class AMuleCli {
      */
     public search(q: string, searchType: number = this.EC_SEARCH_TYPE.EC_SEARCH_KAD, strict = true): Promise<Response> {
         q = q.trim();
-        return this.sendToServerWhenAvalaible(this._getSearchStartRequest(q, searchType), false, 'search').then(res => {
+        return this.sendToServer(this._getSearchStartRequest(q, searchType)).then(res => {
             return new Promise<Response>((resolve, reject) => {
                 if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
                     let timeout = 120, frequency = 2000, count = 0, isSearchFinished = false;
@@ -835,7 +811,7 @@ export class AMuleCli {
                                 resolve(this.filterResultList(list, q, strict));
                             })
                         }
-                        this.sendToServerWhenAvalaible(this._isSearchFinished(), true, '_isSearchFinished').then(res => {
+                        this.sendToServer(this._isSearchFinished()).then(res => {
                             if (res.children && res.children[0] && res.children[0].value !== 0) {
                                 isSearchFinished = true;
                             }
@@ -857,15 +833,15 @@ export class AMuleCli {
         });
     }
 
-    public fetchSearch(isSkipable?: boolean): Promise<Response> {
-        return this.sendToServerWhenAvalaible(this.getSearchResultRequest(), isSkipable, 'fetchSearch');
+    public fetchSearch(): Promise<Response> {
+        return this.sendToServer(this.getSearchResultRequest());
     }
 
     /**
      * get all the files being currently downloaded
      */
     public getDownloads(isSkipable?: boolean): Promise<Response> {
-        return this.sendToServerWhenAvalaible(this.getDownloadsRequest(), isSkipable, 'getDownloads').then(elements => {
+        return this.sendToServer(this.getDownloadsRequest()).then(elements => {
             if (elements.children) {
                 elements.children.map(f => {
                     ['partfile_last_recv', 'partfile_last_seen_comp'].map(key => {
@@ -899,7 +875,7 @@ export class AMuleCli {
      * return the list of shared files
      */
     public getSharedFiles(isSkipable?: boolean): Promise<Response> {
-        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest(), isSkipable, 'getSharedFiles').then(elements => {
+        return this.sendToServer(this.getSharedFilesRequest()).then(elements => {
             elements.children.map(f => {
                 ['knownfile_req_count_all', 'sharedRatio'].map(key => {
                     if (!f[key]) {
@@ -921,7 +897,7 @@ export class AMuleCli {
      * 
      */
     public getDetailUpdate(isSkipable?: boolean): Promise<Response> {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest(82), isSkipable, 'getDetailUpdate');
+        return this.sendToServer(this.getStatsRequest(82));
     }
 
     /**
@@ -931,7 +907,7 @@ export class AMuleCli {
         return this.sendToServer_simple(this.simpleRequest(0x53));
     }
     public getStatistiques(isSkipable?: boolean): Promise<Response> {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest(10), isSkipable, 'getStatistiques');
+        return this.sendToServer(this.getStatsRequest(10));
     }
     public setMaxDownload(limit): Promise<ArrayBuffer> {
         return this.sendToServer_simple(this.getSetMaxBandwithRequest(4867, limit));
@@ -947,7 +923,7 @@ export class AMuleCli {
      * get user preferences (EC_OP_GET_PREFERENCES)
      */
     public getPreferences(isSkipable?: boolean): Promise<Response> {
-        return this.sendToServerWhenAvalaible(this.getPreferencesRequest(), isSkipable, 'getPreferences');
+        return this.sendToServer(this.getPreferencesRequest());
     }
 
     /**

@@ -77,7 +77,6 @@ var AMuleCli = /** @class */ (function () {
             { EC_TAG_STATS_UL_SPEED: 512 }, { EC_TAG_STATS_DL_SPEED: 513 }, { EC_TAG_STATS_UL_SPEED_LIMIT: 514 }, { EC_TAG_STATS_DL_SPEED_LIMIT: 515 },
             { EC_TAG_PREFS_DIRECTORIES: 6656 }, { EC_TAG_DIRECTORIES_INCOMING: 6657 }, { EC_TAG_DIRECTORIES_TEMP: 6658 }
         ];
-        this.isRunningPromise = false;
         this.ip = ip;
         this.port = port;
         this.md5Function = md5Function;
@@ -737,7 +736,7 @@ var AMuleCli = /** @class */ (function () {
                     throw 'time out expired for this TCP request';
                 }
             }, frequency);
-        });
+        }).then(function (data) { return _this.readResultsList(data); });
     };
     ;
     AMuleCli.prototype.connect = function () {
@@ -759,32 +758,6 @@ var AMuleCli = /** @class */ (function () {
         });
     };
     ;
-    /**
-     * Make the promises flow synchronized
-     */
-    AMuleCli.prototype.sendToServerWhenAvalaible = function (r, isSkipable, label) {
-        var _this = this;
-        if (!this.isRunningPromise) {
-            this.isRunningPromise = true;
-            return this.sendToServer(r).then(function (data) {
-                _this.isRunningPromise = false;
-                return _this.readResultsList(data);
-            });
-        }
-        else {
-            console.log("delayed");
-            return new Promise(function (resolve, reject) {
-                if (!isSkipable) {
-                    setTimeout(function () {
-                        resolve(_this.sendToServerWhenAvalaible(r, isSkipable, label));
-                    }, 1000);
-                }
-                else {
-                    resolve(new Response());
-                }
-            });
-        }
-    };
     AMuleCli.prototype.filterResultList = function (list, q, strict) {
         if (strict && list.children) {
             list.children = list.children.filter(function (e) {
@@ -809,7 +782,7 @@ var AMuleCli = /** @class */ (function () {
         if (searchType === void 0) { searchType = this.EC_SEARCH_TYPE.EC_SEARCH_KAD; }
         if (strict === void 0) { strict = true; }
         q = q.trim();
-        return this.sendToServerWhenAvalaible(this._getSearchStartRequest(q, searchType), false, 'search').then(function (res) {
+        return this.sendToServer(this._getSearchStartRequest(q, searchType)).then(function (res) {
             return new Promise(function (resolve, reject) {
                 if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
                     var timeout_1 = 120, frequency = 2000, count_1 = 0, isSearchFinished_1 = false;
@@ -820,7 +793,7 @@ var AMuleCli = /** @class */ (function () {
                                 resolve(_this.filterResultList(list, q, strict));
                             });
                         }
-                        _this.sendToServerWhenAvalaible(_this._isSearchFinished(), true, '_isSearchFinished').then(function (res) {
+                        _this.sendToServer(_this._isSearchFinished()).then(function (res) {
                             if (res.children && res.children[0] && res.children[0].value !== 0) {
                                 isSearchFinished_1 = true;
                             }
@@ -842,14 +815,14 @@ var AMuleCli = /** @class */ (function () {
             });
         });
     };
-    AMuleCli.prototype.fetchSearch = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.getSearchResultRequest(), isSkipable, 'fetchSearch');
+    AMuleCli.prototype.fetchSearch = function () {
+        return this.sendToServer(this.getSearchResultRequest());
     };
     /**
      * get all the files being currently downloaded
      */
     AMuleCli.prototype.getDownloads = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.getDownloadsRequest(), isSkipable, 'getDownloads').then(function (elements) {
+        return this.sendToServer(this.getDownloadsRequest()).then(function (elements) {
             if (elements.children) {
                 elements.children.map(function (f) {
                     ['partfile_last_recv', 'partfile_last_seen_comp'].map(function (key) {
@@ -880,7 +853,7 @@ var AMuleCli = /** @class */ (function () {
      * return the list of shared files
      */
     AMuleCli.prototype.getSharedFiles = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.getSharedFilesRequest(), isSkipable, 'getSharedFiles').then(function (elements) {
+        return this.sendToServer(this.getSharedFilesRequest()).then(function (elements) {
             elements.children.map(function (f) {
                 ['knownfile_req_count_all', 'sharedRatio'].map(function (key) {
                     if (!f[key]) {
@@ -901,7 +874,7 @@ var AMuleCli = /** @class */ (function () {
      *
      */
     AMuleCli.prototype.getDetailUpdate = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest(82), isSkipable, 'getDetailUpdate');
+        return this.sendToServer(this.getStatsRequest(82));
     };
     /**
      * EC_OP_CLEAR_COMPLETED
@@ -910,7 +883,7 @@ var AMuleCli = /** @class */ (function () {
         return this.sendToServer_simple(this.simpleRequest(0x53));
     };
     AMuleCli.prototype.getStatistiques = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.getStatsRequest(10), isSkipable, 'getStatistiques');
+        return this.sendToServer(this.getStatsRequest(10));
     };
     AMuleCli.prototype.setMaxDownload = function (limit) {
         return this.sendToServer_simple(this.getSetMaxBandwithRequest(4867, limit));
@@ -925,7 +898,7 @@ var AMuleCli = /** @class */ (function () {
      * get user preferences (EC_OP_GET_PREFERENCES)
      */
     AMuleCli.prototype.getPreferences = function (isSkipable) {
-        return this.sendToServerWhenAvalaible(this.getPreferencesRequest(), isSkipable, 'getPreferences');
+        return this.sendToServer(this.getPreferencesRequest());
     };
     /**
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)

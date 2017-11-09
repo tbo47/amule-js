@@ -21,7 +21,7 @@ aMule.connect().then(m => {
   console.log(m);
   
   aMule.getSharedFiles().then(res => {
-    res.children.forEach(e => console.log(e['partfile_name']));
+    res.map(e => console.log(e['partfile_name']));
   });
 
 });

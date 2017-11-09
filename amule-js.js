@@ -748,6 +748,7 @@ var AMuleCli = /** @class */ (function () {
             return _this.sendToServer_simple(_this._getAuthRequest2());
         }).then(function (data) {
             if (_this.readSalt(data) === 4) {
+                _this.isConnected = true;
                 return 'You are successfuly connected to amule';
             }
             else {
@@ -821,7 +822,7 @@ var AMuleCli = /** @class */ (function () {
     /**
      * get all the files being currently downloaded
      */
-    AMuleCli.prototype.getDownloads = function (isSkipable) {
+    AMuleCli.prototype.getDownloads = function () {
         return this.sendToServer(this.getDownloadsRequest()).then(function (elements) {
             if (elements.children) {
                 elements.children.map(function (f) {
@@ -838,7 +839,7 @@ var AMuleCli = /** @class */ (function () {
                     delete f.children;
                 });
             }
-            return elements;
+            return elements.children;
         });
     };
     /**
@@ -852,7 +853,7 @@ var AMuleCli = /** @class */ (function () {
     /**
      * return the list of shared files
      */
-    AMuleCli.prototype.getSharedFiles = function (isSkipable) {
+    AMuleCli.prototype.getSharedFiles = function () {
         return this.sendToServer(this.getSharedFilesRequest()).then(function (elements) {
             elements.children.map(function (f) {
                 ['knownfile_req_count_all', 'sharedRatio'].map(function (key) {
@@ -862,27 +863,27 @@ var AMuleCli = /** @class */ (function () {
                 });
                 delete f.children;
                 // remove files being currently downloaded
-                if (f['knownfile_filename'].endsWith('.part')) {
+                if (f['knownfile_filename'] && f['knownfile_filename'].endsWith('.part')) {
                     var index = elements.children.indexOf(f);
                     elements.children.splice(index, 1);
                 }
             });
-            return elements;
+            return elements.children;
         });
     };
     /**
      *
      */
-    AMuleCli.prototype.getDetailUpdate = function (isSkipable) {
+    AMuleCli.prototype.getDetailUpdate = function () {
         return this.sendToServer(this.getStatsRequest(82));
     };
     /**
      * EC_OP_CLEAR_COMPLETED
      */
-    AMuleCli.prototype.clearCompleted = function (isSkipable) {
+    AMuleCli.prototype.clearCompleted = function () {
         return this.sendToServer_simple(this.simpleRequest(0x53));
     };
-    AMuleCli.prototype.getStatistiques = function (isSkipable) {
+    AMuleCli.prototype.getStatistiques = function () {
         return this.sendToServer(this.getStatsRequest(10));
     };
     AMuleCli.prototype.setMaxDownload = function (limit) {
@@ -897,14 +898,29 @@ var AMuleCli = /** @class */ (function () {
     /**
      * get user preferences (EC_OP_GET_PREFERENCES)
      */
-    AMuleCli.prototype.getPreferences = function (isSkipable) {
+    AMuleCli.prototype.getPreferences = function () {
         return this.sendToServer(this.getPreferencesRequest());
     };
     /**
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
      */
-    AMuleCli.prototype.reloadSharedFiles = function (isSkipable) {
+    AMuleCli.prototype.reloadSharedFiles = function () {
         return this.sendToServer_simple(this.simpleRequest(35));
+    };
+    /**
+     * get the date. Example: "2017-11"
+     */
+    AMuleCli.prototype.getMonth = function () {
+        var dateObj = new Date(), month = dateObj.getUTCMonth() + 1, monthStr = ('00' + month).slice(-2), year = dateObj.getUTCFullYear();
+        return year + '-' + monthStr;
+    };
+    /**
+     * @param funcs array of function with promises to execute
+     */
+    AMuleCli.prototype.promiseSerial = function (funcs) {
+        return funcs.reduce(function (promise, func) {
+            return promise.then(function (result) { return func().then(function (x) { return result.concat(x); }); });
+        }, Promise.resolve([]));
     };
     return AMuleCli;
 }());

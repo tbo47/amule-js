@@ -19,8 +19,8 @@ aMule.connect().then(m => {
   aMule.reloadSharedFiles().then(result => {
     aMule.getSharedFiles().then(res => {
       console.log('<html><body>');
-      console.log('<div>' + res.children.length + ' files are shared</div>');
-      res.children.forEach(e => console.log('<a href="' + e['partfile_ed2k_link'] + '">' + e['partfile_name'] + '</a><br>'));
+      console.log('<div>' + res.length + ' files are shared</div>');
+      res.map(e => console.log('<a href="' + e['partfile_ed2k_link'] + '">' + e['partfile_name'] + '</a><br>'));
       console.log('</body></html>');
       process.exit(0);
     });

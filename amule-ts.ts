@@ -767,6 +767,7 @@ export class AMuleCli {
             return this.sendToServer_simple(this._getAuthRequest2());
         }).then(data => {
             if (this.readSalt(data) === 4) {
+                this.isConnected = true
                 return 'You are successfuly connected to amule'
             }
             else {
@@ -840,7 +841,7 @@ export class AMuleCli {
     /**
      * get all the files being currently downloaded
      */
-    public getDownloads(isSkipable?: boolean): Promise<Response> {
+    public getDownloads(): Promise<Response[]> {
         return this.sendToServer(this.getDownloadsRequest()).then(elements => {
             if (elements.children) {
                 elements.children.map(f => {
@@ -858,7 +859,7 @@ export class AMuleCli {
                 });
             }
 
-            return elements;
+            return elements.children;
         });
     }
 
@@ -874,7 +875,7 @@ export class AMuleCli {
     /**
      * return the list of shared files
      */
-    public getSharedFiles(isSkipable?: boolean): Promise<Response> {
+    public getSharedFiles(): Promise<Response[]> {
         return this.sendToServer(this.getSharedFilesRequest()).then(elements => {
             elements.children.map(f => {
                 ['knownfile_req_count_all', 'sharedRatio'].map(key => {
@@ -884,29 +885,29 @@ export class AMuleCli {
                 });
                 delete f.children;
                 // remove files being currently downloaded
-                if (f['knownfile_filename'].endsWith('.part')) {
+                if (f['knownfile_filename'] && f['knownfile_filename'].endsWith('.part')) {
                     let index = elements.children.indexOf(f);
                     elements.children.splice(index, 1);
                 }
             });
-            return elements;
+            return elements.children;
         });
     }
 
     /**
      * 
      */
-    public getDetailUpdate(isSkipable?: boolean): Promise<Response> {
+    public getDetailUpdate(): Promise<Response> {
         return this.sendToServer(this.getStatsRequest(82));
     }
 
     /**
      * EC_OP_CLEAR_COMPLETED
      */
-    public clearCompleted(isSkipable?: boolean): Promise<ArrayBuffer> {
+    public clearCompleted(): Promise<ArrayBuffer> {
         return this.sendToServer_simple(this.simpleRequest(0x53));
     }
-    public getStatistiques(isSkipable?: boolean): Promise<Response> {
+    public getStatistiques(): Promise<Response> {
         return this.sendToServer(this.getStatsRequest(10));
     }
     public setMaxDownload(limit): Promise<ArrayBuffer> {
@@ -922,15 +923,34 @@ export class AMuleCli {
     /**
      * get user preferences (EC_OP_GET_PREFERENCES)
      */
-    public getPreferences(isSkipable?: boolean): Promise<Response> {
+    public getPreferences(): Promise<Response> {
         return this.sendToServer(this.getPreferencesRequest());
     }
 
     /**
      * reload shared files list (EC_OP_SHAREDFILES_RELOAD)
      */
-    public reloadSharedFiles(isSkipable?: boolean): Promise<ArrayBuffer> {
+    public reloadSharedFiles(): Promise<ArrayBuffer> {
         return this.sendToServer_simple(this.simpleRequest(35));
     }
 
+    /**
+     * get the date. Example: "2017-11"
+     */
+    public getMonth(): string {
+        const dateObj = new Date(),
+            month = dateObj.getUTCMonth() + 1,
+            monthStr: string = ('00' + month).slice(-2),
+            year: number = dateObj.getUTCFullYear();
+        return year + '-' + monthStr;
+    }
+
+    /**
+     * @param funcs array of function with promises to execute
+     */
+    public promiseSerial<T>(funcs: Array<() => Promise<T>>) {
+        return funcs.reduce((promise, func) =>
+            promise.then(result => func().then(x => result.concat(x))),
+            Promise.resolve<T[]>([]));
+    }
 }

@@ -21,7 +21,7 @@ aMule.connect().then(m => {
   const query = 'clo2 ' + aMule.getMonth();
   aMule.search(query, 2).then(result => {
     const funcs = result.children.map(e => () => aMule.download(e))
-    console.log('%d results found for query: %d', funcs.length, query);
+    console.log('%d results found for query: %s', funcs.length, query);
     aMule.promiseSerial(funcs).then(list => {
       list.map(e => console.log(e['partfile_name']))
       process.exit(0);

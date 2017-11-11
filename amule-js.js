@@ -772,27 +772,24 @@ var AMuleCli = /** @class */ (function () {
                 return isPresent;
             });
         }
-        return list;
+        return list.children;
     };
     /**
      * Search on the server
      *
      */
-    AMuleCli.prototype.search = function (q, searchType, strict) {
+    AMuleCli.prototype.__search = function (q, network, strict) {
         var _this = this;
-        if (searchType === void 0) { searchType = this.EC_SEARCH_TYPE.EC_SEARCH_KAD; }
         if (strict === void 0) { strict = true; }
         q = q.trim();
-        return this.sendToServer(this._getSearchStartRequest(q, searchType)).then(function (res) {
+        return this.sendToServer(this._getSearchStartRequest(q, network)).then(function (res) {
             return new Promise(function (resolve, reject) {
-                if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
+                if (network === _this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
                     var timeout_1 = 120, frequency = 2000, count_1 = 0, isSearchFinished_1 = false;
                     var intervalId_1 = setInterval(function () {
                         if (isSearchFinished_1) {
                             clearInterval(intervalId_1);
-                            _this.fetchSearch().then(function (list) {
-                                resolve(_this.filterResultList(list, q, strict));
-                            });
+                            _this.fetchSearch().then(function (list) { return resolve(_this.filterResultList(list, q, strict)); });
                         }
                         _this.sendToServer(_this._isSearchFinished()).then(function (res) {
                             if (res.children && res.children[0] && res.children[0].value !== 0) {
@@ -805,14 +802,38 @@ var AMuleCli = /** @class */ (function () {
                         }
                     }, frequency);
                 }
-                else if (searchType === _this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
+                else if (network === _this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
                     // TODO to improve
                     setTimeout(function () {
-                        _this.fetchSearch().then(function (list) {
-                            resolve(_this.filterResultList(list, q, strict));
-                        });
+                        _this.fetchSearch().then(function (list) { return resolve(_this.filterResultList(list, q, strict)); });
                     }, 1500);
                 }
+            });
+        });
+    };
+    AMuleCli.prototype._clean = function (str) {
+        return str
+            .replace(new RegExp('Ã©', 'g'), 'e')
+            .replace(new RegExp('�', 'g'), 'A')
+            .replace(new RegExp('Ã¨', 'g'), 'e');
+    };
+    /**
+     * Perform a search on the amule server.
+     *
+     * @param q
+     * @param network
+     */
+    AMuleCli.prototype.search = function (q, network) {
+        var _this = this;
+        if (network === void 0) { network = this.EC_SEARCH_TYPE.EC_SEARCH_KAD; }
+        return this.getSharedFiles().then(function (allFiles) {
+            return _this.getDownloads().then(function (dlFiles) {
+                return _this.__search(q, network).then(function (list) {
+                    allFiles.map(function (f) { return list.map(function (s) { return s.partfile_hash === f.partfile_hash ? s.present = true : false; }); });
+                    dlFiles.map(function (f) { return list.map(function (s) { return s.partfile_hash === f.partfile_hash ? s.currentDl = true : false; }); });
+                    list.map(function (e) { return e.partfile_name = _this._clean(e.partfile_name); });
+                    return list;
+                });
             });
         });
     };

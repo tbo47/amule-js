@@ -2,6 +2,7 @@
 import * as net from 'net';
 
 class Response {
+    [x: string]: any;
     public header: number;
     public totalSizeOfRequest: number = 0;
     public opCode = null;
@@ -778,7 +779,7 @@ export class AMuleCli {
         });
     };
 
-    private filterResultList(list: Response, q: string, strict: boolean): Response {
+    private filterResultList(list: Response, q: string, strict: boolean): Response[] {
         if (strict && list.children) {
             list.children = list.children.filter(e => {
                 let isPresent = true;
@@ -791,7 +792,7 @@ export class AMuleCli {
                 return isPresent;
             });
         }
-        return list;
+        return list.children;
     }
 
 
@@ -799,18 +800,16 @@ export class AMuleCli {
      * Search on the server
      * 
      */
-    public search(q: string, searchType: number = this.EC_SEARCH_TYPE.EC_SEARCH_KAD, strict = true): Promise<Response> {
+    public __search(q: string, network: number, strict = true): Promise<Response[]> {
         q = q.trim();
-        return this.sendToServer(this._getSearchStartRequest(q, searchType)).then(res => {
-            return new Promise<Response>((resolve, reject) => {
-                if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
+        return this.sendToServer(this._getSearchStartRequest(q, network)).then(res => {
+            return new Promise<Response[]>((resolve, reject) => {
+                if (network === this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
                     let timeout = 120, frequency = 2000, count = 0, isSearchFinished = false;
                     const intervalId = setInterval(() => {
                         if (isSearchFinished) {
                             clearInterval(intervalId);
-                            this.fetchSearch().then(list => {
-                                resolve(this.filterResultList(list, q, strict));
-                            })
+                            this.fetchSearch().then(list => resolve(this.filterResultList(list, q, strict)))
                         }
                         this.sendToServer(this._isSearchFinished()).then(res => {
                             if (res.children && res.children[0] && res.children[0].value !== 0) {
@@ -822,14 +821,38 @@ export class AMuleCli {
                             clearInterval(intervalId);
                         }
                     }, frequency);
-                } else if (searchType === this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
+                } else if (network === this.EC_SEARCH_TYPE.EC_SEARCH_LOCA) {
                     // TODO to improve
                     setTimeout(() => {
-                        this.fetchSearch().then(list => {
-                            resolve(this.filterResultList(list, q, strict));
-                        })
+                        this.fetchSearch().then(list => resolve(this.filterResultList(list, q, strict)))
                     }, 1500);
                 }
+            });
+        });
+    }
+
+    public _clean(str: string) {
+        return str
+            .replace(new RegExp('Ã©', 'g'), 'e')
+            .replace(new RegExp('�', 'g'), 'A')
+            .replace(new RegExp('Ã¨', 'g'), 'e')
+    }
+
+    /**
+     * Perform a search on the amule server.
+     * 
+     * @param q
+     * @param network 
+     */
+    public search(q: string, network: number = this.EC_SEARCH_TYPE.EC_SEARCH_KAD) {
+        return this.getSharedFiles().then(allFiles => {
+            return this.getDownloads().then(dlFiles => {
+                return this.__search(q, network).then(list => {
+                    allFiles.map(f => list.map(s => s.partfile_hash === f.partfile_hash ? s.present = true : false));
+                    dlFiles.map(f => list.map(s => s.partfile_hash === f.partfile_hash ? s.currentDl = true : false));
+                    list.map(e => e.partfile_name = this._clean(e.partfile_name))
+                    return list
+                });
             });
         });
     }

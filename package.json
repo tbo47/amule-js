@@ -9,7 +9,7 @@
   "devDependencies": {
     "nodemon": "^1.11.0",
     "ts-node": "^3.3.0",
-    "@types/chrome": "0.0.52",
+    "@types/chrome": "0.0.53",
     "@types/es6-promise": "0.0.33",
     "@types/node": "^8.0.47",
     "typescript": "^2.1.5"
@@ -24,7 +24,7 @@
   ],
   "license": "MIT",
   "scripts": {
-    "start": "npm run js ; npm run example1",
+    "start": "npm run js ; npm install ; npm run example1",
     "example1": "./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node doc/amule-js-node-ex1.ts",
     "example2": "./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node doc/amule-js-node-ex2.ts",
     "example2-dev": "nodemon -e \"ts\" --exec \"./node_modules/typescript/bin/tsc ./amule-ts.ts && ./node_modules/.bin/ts-node doc/amule-js-node-ex2.ts\"",
